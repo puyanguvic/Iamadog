@@ -1,0 +1,53 @@
+To Do List:
+=== DSR ===  Target on: 
+1. Routing table: Currently we have the single-entry routing table, i.e. only showing a single next hop's IP address and the corresponding cost to reach the destination.    
+Our goal: Routing table with multiple entries to the same destination.
+i.e.			------------------------------------
+			 Dst	Gateway	    Cost     Type
+			------------------------------------
+			  w       u1        D1(w,u)     DG    (Dealy-guaranteed)
+			-------------------------------------
+			
+i.e.			------------------------------------
+			 Dst	Gateway	    Cost     Type
+			------------------------------------
+			  w       u2          -        BE    (Best-effort)
+			-------------------------------------
+Finish by: 
+
+
+2. Routing algorithm: Currently the routes are calculated based on per-hop cost for the DG traffic only. The route for BE is missing. Also we hope to reserve more path options in the routing table. 
+Our goal: Researve path diversity for DG traffic, i.e. show more routes in the routing table by using lower granularity of per-hop cost.
+	  Apply different routing algorithm for different traffics. 
+
+2. Bug: Last hop does not show total cost --> Output "error: time expire", sent to fast lane
+
+Finish by: 
+
+3. WRR weight scheduling: Currently the weight assigned to each lane is fixed values. 
+Our goal: dynamic, adaptive weight scheduling scheme.
+
+Finish by: 
+
+4. Applications: Currently only the UDP-CBR traffics are used in the simulation. TCP traffic failed to work due to module modification.
+Our goal: Apply TCP traffic to run the simluations
+
+Finish by: 
+
+5. Statistics collection: Currently total delay cost of all sinkApps are recorded. 
+Our goal: Record the target sinkApps only, i.e. the target traffic flows.
+
+Finish by: 
+
+
+====================== Recent To Do ===========================
+RXY:
+1. Set FlagTag to distinguish target flow from others --- done
+2. Trace queue length of each node --- done
+3. Fix last hop issue
+4. Try to record per-hop budget to file
+5. Adjust Max Queue Size for each lane 
+
+Pu:
+1. Separate two routing algorithm for DSR and BE traffics
+
