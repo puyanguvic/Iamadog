@@ -45,31 +45,31 @@ class Ipv4DSRRouting;
  * @brief Vertex used in shortest path first (SPF) computations. See \RFC{2328},
  * Section 16.
  *
- * Each router in the simulation is associated with an SPFVertex object.  When
+ * Each router in the simulation is associated with an DSRVertex object.  When
  * calculating routes, each of these routers is, in turn, chosen as the "root"
  * of the calculation and routes to all of the other routers are eventually
  * saved in the routing tables of each of the chosen nodes.  Each of these 
- * routers in the calculation has an associated SPFVertex.
+ * routers in the calculation has an associated DSRVertex.
  *
- * The "Root" vertex is the SPFVertex representing the router that is having
- * its routing tables set.  The SPFVertex objects representing other routers
+ * The "Root" vertex is the DSRVertex representing the router that is having
+ * its routing tables set.  The DSRVertex objects representing other routers
  * or networks in the simulation are arranged in the SPF tree.  It is this 
  * tree that represents the Shortest Paths to the other networks.
  *
- * Each SPFVertex has a pointer to the Global Router Link State Advertisement
+ * Each DSRVertex has a pointer to the Global Router Link State Advertisement
  * (LSA) that its underlying router has exported.  Within these LSAs are
  * Global Router Link Records that describe the point to point links from the
- * underlying router to other nodes (represented by other SPFVertex objects)
+ * underlying router to other nodes (represented by other DSRVertex objects)
  * in the simulation topology.  The combination of the arrangement of the 
- * SPFVertex objects in the SPF tree, along with the details of the link
+ * DSRVertex objects in the SPF tree, along with the details of the link
  * records that connect them provide the information required to construct the
  * required routes.
  */
-class SPFVertex
+class DSRVertex
 {
 public:
 /**
- * @brief Enumeration of the possible types of SPFVertex objects.
+ * @brief Enumeration of the possible types of DSRVertex objects.
  *
  * Currently we use VertexRouter to identify objects that represent a router 
  * in the simulation topology, and VertexNetwork to identify objects that 
@@ -82,88 +82,88 @@ public:
   };
 
 /**
- * @brief Construct an empty ("uninitialized") SPFVertex (Shortest Path First 
+ * @brief Construct an empty ("uninitialized") DSRVertex (Shortest Path First 
  * Vertex).
  *
  * The Vertex Type is set to VertexUnknown, the Vertex ID is set to 
  * 255.255.255.255, and the distance from root is set to infinity 
  * (UINT32_MAX).  The referenced Link State Advertisement (LSA) is set to 
- * null as is the parent SPFVertex.  The outgoing interface index is set to
+ * null as is the parent DSRVertex.  The outgoing interface index is set to
  * infinity, the next hop address is set to 0.0.0.0 and the list of children
- * of the SPFVertex is initialized to empty.
+ * of the DSRVertex is initialized to empty.
  *
  * @see VertexType
  */
-  SPFVertex();
+  DSRVertex();
 
 /**
- * @brief Construct an initialized SPFVertex (Shortest Path First Vertex).
+ * @brief Construct an initialized DSRVertex (Shortest Path First Vertex).
  *
  * The Vertex Type is initialized to VertexRouter and the Vertex ID is found
  * from the Link State ID of the Link State Advertisement (LSA) passed as a
  * parameter.  The Link State ID is set to the Router ID of the advertising
  * router.  The referenced LSA (m_lsa) is set to the given LSA.  Other than 
  * these members, initialization is as in the default constructor.
- * of the SPFVertex is initialized to empty.
+ * of the DSRVertex is initialized to empty.
  *
- * @see SPFVertex::SPFVertex ()
+ * @see DSRVertex::DSRVertex ()
  * @see VertexType
  * @see GlobalRoutingLSA
  * @param lsa The Link State Advertisement used for finding initial values.
  */
-  SPFVertex(DSRRoutingLSA* lsa);
+  DSRVertex(DSRRoutingLSA* lsa);
 
 /**
- * @brief Destroy an SPFVertex (Shortest Path First Vertex).
+ * @brief Destroy an DSRVertex (Shortest Path First Vertex).
  *
- * The children vertices of the SPFVertex are recursively deleted.
+ * The children vertices of the DSRVertex are recursively deleted.
  *
- * @see SPFVertex::SPFVertex ()
+ * @see DSRVertex::DSRVertex ()
  */
-  ~SPFVertex();
+  ~DSRVertex();
 
 /**
- * @brief Get the Vertex Type field of a SPFVertex object.
+ * @brief Get the Vertex Type field of a DSRVertex object.
  *
- * The Vertex Type describes the kind of simulation object a given SPFVertex
+ * The Vertex Type describes the kind of simulation object a given DSRVertex
  * represents.
  *
  * @see VertexType
- * @returns The VertexType of the current SPFVertex object.
+ * @returns The VertexType of the current DSRVertex object.
  */
   VertexType GetVertexType (void) const;
 
 /**
- * @brief Set the Vertex Type field of a SPFVertex object.
+ * @brief Set the Vertex Type field of a DSRVertex object.
  *
- * The Vertex Type describes the kind of simulation object a given SPFVertex
+ * The Vertex Type describes the kind of simulation object a given DSRVertex
  * represents.
  *
  * @see VertexType
- * @param type The new VertexType for the current SPFVertex object.
+ * @param type The new VertexType for the current DSRVertex object.
  */
   void SetVertexType (VertexType type);
 
 /**
- * @brief Get the Vertex ID field of a SPFVertex object.
+ * @brief Get the Vertex ID field of a DSRVertex object.
  *
- * The Vertex ID uniquely identifies the simulation object a given SPFVertex
- * represents.  Typically, this is the Router ID for SPFVertex objects 
+ * The Vertex ID uniquely identifies the simulation object a given DSRVertex
+ * represents.  Typically, this is the Router ID for DSRVertex objects 
  * representing routers, and comes from the Link State Advertisement of a 
  * router aggregated to a node in the simulation.  These IDs are allocated
  * automatically by the routing environment and look like IP addresses 
  * beginning at 0.0.0.0 and monotonically increasing as new routers are
  * instantiated.
  *
- * @returns The Ipv4Address Vertex ID of the current SPFVertex object.
+ * @returns The Ipv4Address Vertex ID of the current DSRVertex object.
  */
   Ipv4Address GetVertexId (void) const;
 
 /**
- * @brief Set the Vertex ID field of a SPFVertex object.
+ * @brief Set the Vertex ID field of a DSRVertex object.
  *
- * The Vertex ID uniquely identifies the simulation object a given SPFVertex
- * represents.  Typically, this is the Router ID for SPFVertex objects 
+ * The Vertex ID uniquely identifies the simulation object a given DSRVertex
+ * represents.  Typically, this is the Router ID for DSRVertex objects 
  * representing routers, and comes from the Link State Advertisement of a 
  * router aggregated to a node in the simulation.  These IDs are allocated
  * automatically by the routing environment and look like IP addresses 
@@ -171,49 +171,49 @@ public:
  * instantiated.  This method is an explicit override of the automatically
  * generated value.
  *
- * @param id The new Ipv4Address Vertex ID for the current SPFVertex object.
+ * @param id The new Ipv4Address Vertex ID for the current DSRVertex object.
  */
   void SetVertexId (Ipv4Address id);
 
 /**
  * @brief Get the Global Router Link State Advertisement returned by the 
- * Global Router represented by this SPFVertex during the route discovery 
+ * Global Router represented by this DSRVertex during the route discovery 
  * process.
  *
  * @see DSRRouter
  * @see DSRRoutingLSA
  * @see DSRRouter::DiscoverLSAs ()
  * @returns A pointer to the DSRRoutingLSA found by the router represented
- * by this SPFVertex object.
+ * by this DSRVertex object.
  */
   DSRRoutingLSA* GetLSA (void) const;
 
 /**
  * @brief Set the Global Router Link State Advertisement returned by the 
- * Global Router represented by this SPFVertex during the route discovery 
+ * Global Router represented by this DSRVertex during the route discovery 
  * process.
  *
- * @see SPFVertex::GetLSA ()
+ * @see DSRVertex::GetLSA ()
  * @see DSRRouter
  * @see DSRRoutingLSA
  * @see DSRRouter::DiscoverLSAs ()
- * @warning Ownership of the LSA is transferred to the "this" SPFVertex.  You
+ * @warning Ownership of the LSA is transferred to the "this" DSRVertex.  You
  * must not delete the LSA after calling this method.
  * @param lsa A pointer to the DSRRoutingLSA.
  */
   void SetLSA (DSRRoutingLSA* lsa);
 
 /**
- * @brief Get the distance from the root vertex to "this" SPFVertex object.
+ * @brief Get the distance from the root vertex to "this" DSRVertex object.
  *
- * Each router in the simulation is associated with an SPFVertex object.  When
+ * Each router in the simulation is associated with an DSRVertex object.  When
  * calculating routes, each of these routers is, in turn, chosen as the "root"
  * of the calculation and routes to all of the other routers are eventually
  * saved in the routing tables of each of the chosen nodes.  Each of these 
- * routers in the calculation has an associated SPFVertex.
+ * routers in the calculation has an associated DSRVertex.
  *
- * The "Root" vertex is then the SPFVertex representing the router that is
- * having its routing tables set.  The "this" SPFVertex is the vertex to which
+ * The "Root" vertex is then the DSRVertex representing the router that is
+ * having its routing tables set.  The "this" DSRVertex is the vertex to which
  * a route is being calculated from the root.  The distance from the root that
  * we're asking for is the number of hops from the root vertex to the vertex
  * in question.
@@ -221,47 +221,47 @@ public:
  * The distance is calculated during route discovery and is stored in a
  * member variable.  This method simply fetches that value.
  *
- * @returns The distance, in hops, from the root SPFVertex to "this" SPFVertex.
+ * @returns The distance, in hops, from the root DSRVertex to "this" DSRVertex.
  */
   uint32_t GetDistanceFromRoot (void) const;
 
 /**
- * @brief Set the distance from the root vertex to "this" SPFVertex object.
+ * @brief Set the distance from the root vertex to "this" DSRVertex object.
  *
- * Each router in the simulation is associated with an SPFVertex object.  When
+ * Each router in the simulation is associated with an DSRVertex object.  When
  * calculating routes, each of these routers is, in turn, chosen as the "root"
  * of the calculation and routes to all of the other routers are eventually
  * saved in the routing tables of each of the chosen nodes.  Each of these 
- * routers in the calculation has an associated SPFVertex.
+ * routers in the calculation has an associated DSRVertex.
  *
- * The "Root" vertex is then the SPFVertex representing the router that is
- * having its routing tables set.  The "this" SPFVertex is the vertex to which
+ * The "Root" vertex is then the DSRVertex representing the router that is
+ * having its routing tables set.  The "this" DSRVertex is the vertex to which
  * a route is being calculated from the root.  The distance from the root that
  * we're asking for is the number of hops from the root vertex to the vertex
  * in question.
  *
- * @param distance The distance, in hops, from the root SPFVertex to "this"
- * SPFVertex.
+ * @param distance The distance, in hops, from the root DSRVertex to "this"
+ * DSRVertex.
  */
   void SetDistanceFromRoot (uint32_t distance);
 
 /**
  * @brief Set the IP address and outgoing interface index that should be used 
- * to begin forwarding packets from the root SPFVertex to "this" SPFVertex.
+ * to begin forwarding packets from the root DSRVertex to "this" DSRVertex.
  *
- * Each router node in the simulation is associated with an SPFVertex object.
+ * Each router node in the simulation is associated with an DSRVertex object.
  * When calculating routes, each of these routers is, in turn, chosen as the 
  * "root" of the calculation and routes to all of the other routers are
  * eventually saved in the routing tables of each of the chosen nodes.
  *
- * The "Root" vertex is then the SPFVertex representing the router that is
- * having its routing tables set.  The "this" SPFVertex is the vertex that
+ * The "Root" vertex is then the DSRVertex representing the router that is
+ * having its routing tables set.  The "this" DSRVertex is the vertex that
  * represents the host or network to which a route is being calculated from 
  * the root.  The IP address that we're asking for is the address on the 
  * remote side of a link off of the root node that should be used as the
  * destination for packets along the path to "this" vertex.
  *
- * When initializing the root SPFVertex, the IP address used when forwarding
+ * When initializing the root DSRVertex, the IP address used when forwarding
  * packets is determined by examining the Global Router Link Records of the
  * Link State Advertisement generated by the root node's DSRRouter.  This
  * address is used to forward packets off of the root's network down those
@@ -276,37 +276,37 @@ public:
  * the interface and next hop.
  *
  * In this method we are telling the root node which exit direction it should send
- * should I send a packet to the network or host represented by 'this' SPFVertex.
+ * should I send a packet to the network or host represented by 'this' DSRVertex.
  *
  * @see DSRRouter
  * @see DSRRoutingLSA
  * @see DSRRoutingLinkRecord
  * @param nextHop The IP address to use when forwarding packets to the host
- * or network represented by "this" SPFVertex.
+ * or network represented by "this" DSRVertex.
  * @param id The interface index to use when forwarding packets to the host or
- * network represented by "this" SPFVertex.
+ * network represented by "this" DSRVertex.
  */
-  void SetRootExitDirection (Ipv4Address nextHop, int32_t id = SPF_INFINITY);
+  void SetRootExitDirection (Ipv4Address nextHop, int32_t id = DISTINFINITY);
 
   typedef std::pair<Ipv4Address, int32_t> NodeExit_t; //!< IPv4 / interface container for exit nodes.
 
 /**
  * @brief Set the IP address and outgoing interface index that should be used 
- * to begin forwarding packets from the root SPFVertex to "this" SPFVertex.
+ * to begin forwarding packets from the root DSRVertex to "this" DSRVertex.
  *
- * Each router node in the simulation is associated with an SPFVertex object.
+ * Each router node in the simulation is associated with an DSRVertex object.
  * When calculating routes, each of these routers is, in turn, chosen as the 
  * "root" of the calculation and routes to all of the other routers are
  * eventually saved in the routing tables of each of the chosen nodes.
  *
- * The "Root" vertex is then the SPFVertex representing the router that is
- * having its routing tables set.  The "this" SPFVertex is the vertex that
+ * The "Root" vertex is then the DSRVertex representing the router that is
+ * having its routing tables set.  The "this" DSRVertex is the vertex that
  * represents the host or network to which a route is being calculated from 
  * the root.  The IP address that we're asking for is the address on the 
  * remote side of a link off of the root node that should be used as the
  * destination for packets along the path to "this" vertex.
  *
- * When initializing the root SPFVertex, the IP address used when forwarding
+ * When initializing the root DSRVertex, the IP address used when forwarding
  * packets is determined by examining the Global Router Link Records of the
  * Link State Advertisement generated by the root node's DSRRouter.  This
  * address is used to forward packets off of the root's network down those
@@ -321,15 +321,15 @@ public:
  * the interface and next hop.
  *
  * In this method we are telling the root node which exit direction it should send
- * should I send a packet to the network or host represented by 'this' SPFVertex.
+ * should I send a packet to the network or host represented by 'this' DSRVertex.
  *
  * @see DSRRouter
  * @see DSRRoutingLSA
  * @see DSRRoutingLinkRecord
  * @param exit The pair of next-hop-IP and outgoing-interface-index to use when 
- * forwarding packets to the host or network represented by "this" SPFVertex.
+ * forwarding packets to the host or network represented by "this" DSRVertex.
  */
-  void SetRootExitDirection (SPFVertex::NodeExit_t exit);
+  void SetRootExitDirection (DSRVertex::NodeExit_t exit);
   /**
    * \brief Obtain a pair indicating the exit direction from the root
    *
@@ -358,7 +358,7 @@ public:
    * \param vertex From which the list of exit directions are obtain
    * and are merged into 'this' vertex
    */
-  void MergeRootExitDirections (const SPFVertex* vertex);
+  void MergeRootExitDirections (const DSRVertex* vertex);
   /**
    * \brief Inherit all root exit directions from a given vertex to 'this' vertex
    * \param vertex The vertex from which all root exit directions are to be inherited
@@ -366,7 +366,7 @@ public:
    * After the call of this method, the original root exit directions
    * in 'this' vertex are all lost.
    */
-  void InheritAllRootExitDirections (const SPFVertex* vertex);
+  void InheritAllRootExitDirections (const DSRVertex* vertex);
   /**
    * \brief Get the number of exit directions from root for reaching 'this' vertex
    * \return The number of exit directions from root
@@ -375,44 +375,44 @@ public:
 
 /**
  * @brief Get a pointer to the SPFVector that is the parent of "this" 
- * SPFVertex.
+ * DSRVertex.
  *
- * Each router node in the simulation is associated with an SPFVertex object.
+ * Each router node in the simulation is associated with an DSRVertex object.
  * When calculating routes, each of these routers is, in turn, chosen as the 
  * "root" of the calculation and routes to all of the other routers are
  * eventually saved in the routing tables of each of the chosen nodes.
  *
- * The "Root" vertex is then the SPFVertex representing the router that is
+ * The "Root" vertex is then the DSRVertex representing the router that is
  * having its routing tables set and is the root of the SPF tree.
  *
- * This method returns a pointer to the parent node of "this" SPFVertex
+ * This method returns a pointer to the parent node of "this" DSRVertex
  * (both of which reside in that SPF tree).
  *
  * @param i The index to one of the parents
- * @returns A pointer to the SPFVertex that is the parent of "this" SPFVertex
+ * @returns A pointer to the DSRVertex that is the parent of "this" DSRVertex
  * in the SPF tree.
  */
-  SPFVertex* GetParent (uint32_t i = 0) const;
+  DSRVertex* GetParent (uint32_t i = 0) const;
 
 /**
  * @brief Set the pointer to the SPFVector that is the parent of "this" 
- * SPFVertex.
+ * DSRVertex.
  *
- * Each router node in the simulation is associated with an SPFVertex object.
+ * Each router node in the simulation is associated with an DSRVertex object.
  * When calculating routes, each of these routers is, in turn, chosen as the 
  * "root" of the calculation and routes to all of the other routers are
  * eventually saved in the routing tables of each of the chosen nodes.
  *
- * The "Root" vertex is then the SPFVertex representing the router that is
+ * The "Root" vertex is then the DSRVertex representing the router that is
  * having its routing tables set and is the root of the SPF tree.
  *
- * This method sets the parent pointer of "this" SPFVertex (both of which
+ * This method sets the parent pointer of "this" DSRVertex (both of which
  * reside in that SPF tree).
  *
- * @param parent A pointer to the SPFVertex that is the parent of "this" 
- * SPFVertex* in the SPF tree.
+ * @param parent A pointer to the DSRVertex that is the parent of "this" 
+ * DSRVertex* in the SPF tree.
  */
-  void SetParent (SPFVertex* parent);
+  void SetParent (DSRVertex* parent);
   /**
    * \brief Merge the Parent list from the v into this vertex
    *
@@ -420,84 +420,84 @@ public:
    * and then merged into the list of Parent of *this* vertex.
    * Note that the list in v remains intact
    */
-  void MergeParent (const SPFVertex* v);
+  void MergeParent (const DSRVertex* v);
 
 /**
- * @brief Get the number of children of "this" SPFVertex.
+ * @brief Get the number of children of "this" DSRVertex.
  *
- * Each router node in the simulation is associated with an SPFVertex object.
+ * Each router node in the simulation is associated with an DSRVertex object.
  * When calculating routes, each of these routers is, in turn, chosen as the 
  * "root" of the calculation and routes to all of the other routers are
  * eventually saved in the routing tables of each of the chosen nodes.
  *
- * The "Root" vertex is then the SPFVertex representing the router that is
+ * The "Root" vertex is then the DSRVertex representing the router that is
  * having its routing tables set and is the root of the SPF tree.  Each vertex
  * in the SPF tree can have a number of children that represent host or 
  * network routes available via that vertex.
  *
- * This method returns the number of children of "this" SPFVertex (which 
+ * This method returns the number of children of "this" DSRVertex (which 
  * reside in the SPF tree).
  *
- * @returns The number of children of "this" SPFVertex (which reside in the
+ * @returns The number of children of "this" DSRVertex (which reside in the
  * SPF tree).
  */
   uint32_t GetNChildren (void) const;
 
 /**
- * @brief Get a borrowed SPFVertex pointer to the specified child of "this" 
- * SPFVertex.
+ * @brief Get a borrowed DSRVertex pointer to the specified child of "this" 
+ * DSRVertex.
  *
- * Each router node in the simulation is associated with an SPFVertex object.
+ * Each router node in the simulation is associated with an DSRVertex object.
  * When calculating routes, each of these routers is, in turn, chosen as the 
  * "root" of the calculation and routes to all of the other routers are
  * eventually saved in the routing tables of each of the chosen nodes.
  *
- * The "Root" vertex is then the SPFVertex representing the router that is
+ * The "Root" vertex is then the DSRVertex representing the router that is
  * having its routing tables set and is the root of the SPF tree.  Each vertex
  * in the SPF tree can have a number of children that represent host or 
  * network routes available via that vertex.
  *
- * This method the number of children of "this" SPFVertex (which reside in
+ * This method the number of children of "this" DSRVertex (which reside in
  * the SPF tree.
  *
- * @see SPFVertex::GetNChildren
+ * @see DSRVertex::GetNChildren
  * @param n The index (from 0 to the number of children minus 1) of the 
- * child SPFVertex to return.
+ * child DSRVertex to return.
  * @warning The pointer returned by GetChild () is a borrowed pointer.  You
  * do not have any ownership of the underlying object and must not delete
  * that object.
- * @returns A pointer to the specified child SPFVertex (which resides in the
+ * @returns A pointer to the specified child DSRVertex (which resides in the
  * SPF tree).
  */
-  SPFVertex* GetChild (uint32_t n) const;
+  DSRVertex* GetChild (uint32_t n) const;
 
 /**
- * @brief Get a borrowed SPFVertex pointer to the specified child of "this" 
- * SPFVertex.
+ * @brief Get a borrowed DSRVertex pointer to the specified child of "this" 
+ * DSRVertex.
  *
- * Each router node in the simulation is associated with an SPFVertex object.
+ * Each router node in the simulation is associated with an DSRVertex object.
  * When calculating routes, each of these routers is, in turn, chosen as the 
  * "root" of the calculation and routes to all of the other routers are
  * eventually saved in the routing tables of each of the chosen nodes.
  *
- * The "Root" vertex is then the SPFVertex representing the router that is
+ * The "Root" vertex is then the DSRVertex representing the router that is
  * having its routing tables set and is the root of the SPF tree.  Each vertex
  * in the SPF tree can have a number of children that represent host or 
  * network routes available via that vertex.
  *
- * This method the number of children of "this" SPFVertex (which reside in
+ * This method the number of children of "this" DSRVertex (which reside in
  * the SPF tree.
  *
- * @see SPFVertex::GetNChildren
+ * @see DSRVertex::GetNChildren
  * @warning Ownership of the pointer added to the children of "this" 
- * SPFVertex is transferred to the "this" SPFVertex.  You must not delete the
- * (now) child SPFVertex after calling this method.
- * @param child A pointer to the SPFVertex (which resides in the SPF tree) to
- * be added to the list of children of "this" SPFVertex.
- * @returns The number of children of "this" SPFVertex after the addition of
+ * DSRVertex is transferred to the "this" DSRVertex.  You must not delete the
+ * (now) child DSRVertex after calling this method.
+ * @param child A pointer to the DSRVertex (which resides in the SPF tree) to
+ * be added to the list of children of "this" DSRVertex.
+ * @returns The number of children of "this" DSRVertex after the addition of
  * the new child.
  */
-  uint32_t AddChild (SPFVertex* child);
+  uint32_t AddChild (DSRVertex* child);
 
   /**
    * @brief Set the value of the VertexProcessed flag
@@ -534,34 +534,34 @@ private:
   Ipv4Address m_nextHop; //!< next hop
   typedef std::list< NodeExit_t > ListOfNodeExit_t; //!< container of Exit nodes
   ListOfNodeExit_t m_ecmpRootExits; //!< store the multiple root's exits for supporting ECMP
-  typedef std::list<SPFVertex*> ListOfSPFVertex_t; //!< container of SPFVertexes
-  ListOfSPFVertex_t m_parents; //!< parent list
-  ListOfSPFVertex_t m_children; //!< Children list
+  typedef std::list<DSRVertex*> ListOfDSRVertex_t; //!< container of DSRVertexes
+  ListOfDSRVertex_t m_parents; //!< parent list
+  ListOfDSRVertex_t m_children; //!< Children list
   bool m_vertexProcessed; //!< Flag to note whether vertex has been processed in stage two of SPF computation
 
 /**
- * @brief The SPFVertex copy construction is disallowed.  There's no need for
+ * @brief The DSRVertex copy construction is disallowed.  There's no need for
  * it and a compiler provided shallow copy would be wrong.
  * @param v object to copy from
  */
-  SPFVertex (SPFVertex& v);
+  DSRVertex (DSRVertex& v);
 
 /**
- * @brief The SPFVertex copy assignment operator is disallowed.  There's no 
+ * @brief The DSRVertex copy assignment operator is disallowed.  There's no 
  * need for it and a compiler provided shallow copy would be wrong.
  * @param v object to copy from
  * @returns the copied object
  */
-  SPFVertex& operator= (SPFVertex& v);
+  DSRVertex& operator= (DSRVertex& v);
 
   /**
    * \brief Stream insertion operator.
    *
    * \param os the reference to the output stream
-   * \param vs a list of SPFVertexes
+   * \param vs a list of DSRVertexes
    * \returns the reference to the output stream
    */
-  friend std::ostream& operator<< (std::ostream& os, const SPFVertex::ListOfSPFVertex_t& vs);
+  friend std::ostream& operator<< (std::ostream& os, const DSRVertex::ListOfDSRVertex_t& vs);
 };
 
 /**
@@ -646,11 +646,11 @@ public:
  *
  * This function walks the database and resets the status flags of all of the
  * contained Link State Advertisements to LSA_SPF_NOT_EXPLORED.  This is done
- * prior to each SPF calculation to reset the state of the SPFVertex structures
+ * prior to each SPF calculation to reset the state of the DSRVertex structures
  * that will reference the LSAs during the calculation.
  *
  * @see DSRRoutingLSA
- * @see SPFVertex
+ * @see DSRVertex
  */
   void Initialize ();
 
@@ -690,7 +690,7 @@ private:
   DSRRouteManagerLSDB (DSRRouteManagerLSDB& lsdb);
 
 /**
- * @brief The SPFVertex copy assignment operator is disallowed.  There's no 
+ * @brief The DSRVertex copy assignment operator is disallowed.  There's no 
  * need for it and a compiler provided shallow copy would be wrong.
  * @param lsdb object to copy from
  * @returns the copied object
@@ -858,7 +858,7 @@ private:
  */
   DSRRouteManagerImpl& operator= (DSRRouteManagerImpl& srmi);
 
-  SPFVertex* m_spfroot; //!< the root node
+  DSRVertex* m_spfroot; //!< the root node
   DSRRouteManagerLSDB* m_lsdb; //!< the Link State DataBase (LSDB) of the Global Route Manager
 
   /**
@@ -890,7 +890,7 @@ private:
    *
    * \param v vertex to be processed
    */
-  void SPFProcessStubs (SPFVertex* v);
+  void SPFProcessStubs (DSRVertex* v);
 
   /**
    * \brief Process Autonomous Systems (AS) External LSA
@@ -898,7 +898,7 @@ private:
    * \param v vertex to be processed
    * \param extlsa external LSA
    */
-  void ProcessASExternals (SPFVertex* v, DSRRoutingLSA* extlsa);
+  void ProcessASExternals (DSRVertex* v, DSRRoutingLSA* extlsa);
 
   /**
    * \brief Examine the links in v's LSA and update the list of candidates with any
@@ -921,7 +921,7 @@ private:
    * \param v the vertex
    * \param candidate the SPF candidate queue
    */
-  void SPFNext (SPFVertex* v, CandidateQueue& candidate);
+  void SPFNext (DSRVertex* v, CandidateQueue& candidate);
 
   /**
    * \brief Calculate nexthop from root through V (parent) to vertex W (destination)
@@ -936,7 +936,7 @@ private:
    * \param distance the target distance
    * \returns 1 on success
    */
-  int SPFNexthopCalculation (SPFVertex* v, SPFVertex* w, 
+  int SPFNexthopCalculation (DSRVertex* v, DSRVertex* w, 
                              DSRRoutingLinkRecord* l, uint32_t distance);
 
   /**
@@ -953,7 +953,7 @@ private:
    *
    * \param v the vertex
    */
-  void SPFVertexAddParent (SPFVertex* v);
+  void DSRVertexAddParent (DSRVertex* v);
 
   /**
    * \brief Search for a link between two vertices.
@@ -974,7 +974,7 @@ private:
    * \param prev_link the previous link in the list
    * \returns the link's record
    */
-  DSRRoutingLinkRecord* SPFGetNextLink (SPFVertex* v, SPFVertex* w, 
+  DSRRoutingLinkRecord* SPFGetNextLink (DSRVertex* v, DSRVertex* w, 
                                            DSRRoutingLinkRecord* prev_link);
 
   /**
@@ -999,14 +999,14 @@ private:
    * \param v the vertex
    *
    */
-  void SPFIntraAddRouter (SPFVertex* v, SPFVertex* v_init, Ipv4Address nextHop,  uint32_t Iface);
+  void SPFIntraAddRouter (DSRVertex* v, DSRVertex* v_init, Ipv4Address nextHop,  uint32_t Iface);
 
   /**
    * \brief Add a transit to the routing tables
    *
    * \param v the vertex
    */
-  void SPFIntraAddTransit (SPFVertex* v);
+  void SPFIntraAddTransit (DSRVertex* v);
 
   /**
    * \brief Add a stub to the routing tables
@@ -1014,7 +1014,7 @@ private:
    * \param l the global routing link record
    * \param v the vertex
    */
-  void SPFIntraAddStub (DSRRoutingLinkRecord *l, SPFVertex* v);
+  void SPFIntraAddStub (DSRRoutingLinkRecord *l, DSRVertex* v);
 
   /**
    * \brief Add an external route to the routing tables
@@ -1022,7 +1022,7 @@ private:
    * \param extlsa the external LSA
    * \param v the vertex
    */
-  void SPFAddASExternal (DSRRoutingLSA *extlsa, SPFVertex *v);
+  void SPFAddASExternal (DSRRoutingLSA *extlsa, DSRVertex *v);
 
   /**
    * \brief Return the interface number corresponding to a given IP address and mask
