@@ -47,11 +47,11 @@ operator<< (std::ostream& os, const DSRVertex::VertexType& t)
 }
 
 std::ostream& 
-operator<< (std::ostream& os, const CandidateQueue& q)
+operator<< (std::ostream& os, const DsrCandidateQueue& q)
 {
-  typedef CandidateQueue::CandidateList_t List_t;
+  typedef DsrCandidateQueue::DsrCandidateList_t List_t;
   typedef List_t::const_iterator CIter_t;
-  const CandidateQueue::CandidateList_t& list = q.m_candidates;
+  const DsrCandidateQueue::DsrCandidateList_t& list = q.m_candidates;
 
   os << "*** CandidateQueue Begin (<id, distance, LSA-type>) ***" << std::endl;
   for (CIter_t iter = list.begin (); iter != list.end (); iter++)
@@ -65,20 +65,20 @@ operator<< (std::ostream& os, const CandidateQueue& q)
   return os;
 }
 
-CandidateQueue::CandidateQueue()
+DsrCandidateQueue::DsrCandidateQueue()
   : m_candidates ()
 {
   NS_LOG_FUNCTION (this);
 }
 
-CandidateQueue::~CandidateQueue()
+DsrCandidateQueue::~DsrCandidateQueue()
 {
   NS_LOG_FUNCTION (this);
   Clear ();
 }
 
 void
-CandidateQueue::Clear (void)
+DsrCandidateQueue::Clear (void)
 {
   NS_LOG_FUNCTION (this);
   while (!m_candidates.empty ())
@@ -90,19 +90,19 @@ CandidateQueue::Clear (void)
 }
 
 void
-CandidateQueue::Push (DSRVertex *vNew)
+DsrCandidateQueue::Push (DSRVertex *vNew)
 {
   NS_LOG_FUNCTION (this << vNew);
 
-  CandidateList_t::iterator i = std::upper_bound (
+  DsrCandidateList_t::iterator i = std::upper_bound (
       m_candidates.begin (), m_candidates.end (), vNew,
-      &CandidateQueue::CompareDSRVertex
+      &DsrCandidateQueue::CompareDSRVertex
       );
   m_candidates.insert (i, vNew);
 }
 
 DSRVertex *
-CandidateQueue::Pop (void)
+DsrCandidateQueue::Pop (void)
 {
   NS_LOG_FUNCTION (this);
   if (m_candidates.empty ())
@@ -116,7 +116,7 @@ CandidateQueue::Pop (void)
 }
 
 DSRVertex *
-CandidateQueue::Top (void) const
+DsrCandidateQueue::Top (void) const
 {
   NS_LOG_FUNCTION (this);
   if (m_candidates.empty ())
@@ -128,24 +128,24 @@ CandidateQueue::Top (void) const
 }
 
 bool
-CandidateQueue::Empty (void) const
+DsrCandidateQueue::Empty (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_candidates.empty ();
 }
 
 uint32_t
-CandidateQueue::Size (void) const
+DsrCandidateQueue::Size (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_candidates.size ();
 }
 
 DSRVertex *
-CandidateQueue::Find (const Ipv4Address addr) const
+DsrCandidateQueue::Find (const Ipv4Address addr) const
 {
   NS_LOG_FUNCTION (this);
-  CandidateList_t::const_iterator i = m_candidates.begin ();
+  DsrCandidateList_t::const_iterator i = m_candidates.begin ();
 
   for (; i != m_candidates.end (); i++)
     {
@@ -160,11 +160,11 @@ CandidateQueue::Find (const Ipv4Address addr) const
 }
 
 void
-CandidateQueue::Reorder (void)
+DsrCandidateQueue::Reorder (void)
 {
   NS_LOG_FUNCTION (this);
 
-  m_candidates.sort (&CandidateQueue::CompareDSRVertex);
+  m_candidates.sort (&DsrCandidateQueue::CompareDSRVertex);
   NS_LOG_LOGIC ("After reordering the CandidateQueue");
   NS_LOG_LOGIC (*this);
 }
@@ -177,7 +177,7 @@ CandidateQueue::Reorder (void)
  * This ordering is necessary for implementing ECMP
  */
 bool 
-CandidateQueue::CompareDSRVertex (const DSRVertex* v1, const DSRVertex* v2)
+DsrCandidateQueue::CompareDSRVertex (const DSRVertex* v1, const DSRVertex* v2)
 {
   NS_LOG_FUNCTION (&v1 << &v2);
 

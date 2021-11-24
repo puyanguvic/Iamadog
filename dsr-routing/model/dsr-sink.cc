@@ -181,6 +181,7 @@ void DsrPacketSink::HandleRead (Ptr<Socket> socket)
         { //EOF
           break;
         }
+      // std::cout << "Packet received! " << std::endl;
       TimestampTag t;
       BudgetTag b;
       FlagTag f;   // rxy: Add flag to examin if flow is the target flow

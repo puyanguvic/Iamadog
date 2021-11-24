@@ -196,6 +196,7 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif)
                 }
             }
           allRoutes.push_back (*i);
+          // std::cout << "Found dsr host route = " << allRoutes.size () << std::endl;
           NS_LOG_LOGIC (allRoutes.size () << "Found dsr host route" << *i); 
         }
     }
@@ -255,15 +256,13 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif)
        * distance. Also need to consider the status of the node's queue
       */
       Ipv4DSRRoutingTableEntry* route = allRoutes.at (0);
-      for (RouteVec_t::iterator iter = allRoutes.begin (); 
-            iter != allRoutes.end ();
-           iter ++)
-        {
-          if ((*iter)->GetDistance () > route->GetDistance ())
-            {
-              route = *iter;
-            }
-        }
+      for (uint32_t i = 0; i < allRoutes.size (); i ++)
+      {
+        if (allRoutes.at (i)->GetDistance () < route->GetDistance ())
+          {
+            route = allRoutes.at (i);
+          }
+      }
       
       // std::cout << "the distance =" << route->GetDistance(); 
       // create a Ipv4Route object from the selected routing table entry
@@ -525,6 +524,8 @@ Ipv4DSRRouting::RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDev
 // See if this is a unicast packet we have a route for.
 //
   NS_LOG_LOGIC ("Unicast destination- looking up");
+  header.GetDestination ().Print (std::cout);
+  std::cout << std::endl;
   Ptr<Ipv4Route> rtentry = LookupDSRRoute (header.GetDestination (), oif);
   if (rtentry)
     {

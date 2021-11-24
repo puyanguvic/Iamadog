@@ -36,7 +36,7 @@
 #include "ns3/ipv4-list-routing.h"
 #include "dsr-router-interface.h"
 #include "dsr-route-manager-impl.h"
-#include "ns3/candidate-queue.h"
+#include "dsr-candidate-queue.h"
 #include "ipv4-dsr-routing.h"
 
 namespace ns3 {
@@ -51,16 +51,16 @@ NS_LOG_COMPONENT_DEFINE ("DSRRouteManagerImpl");
  * \returns the reference to the output stream
  */
 std::ostream& 
-operator<< (std::ostream& os, const SPFVertex::NodeExit_t& exit)
+operator<< (std::ostream& os, const DSRVertex::NodeExit_t& exit)
 {
   os << "(" << exit.first << " ," << exit.second << ")";
   return os;
 }
 
 std::ostream& 
-operator<< (std::ostream& os, const SPFVertex::ListOfSPFVertex_t& vs)
+operator<< (std::ostream& os, const DSRVertex::ListOfDSRVertex_t& vs)
 {
-  typedef SPFVertex::ListOfSPFVertex_t::const_iterator CIter_t;
+  typedef DSRVertex::ListOfDSRVertex_t::const_iterator CIter_t;
   os << "{";
   for (CIter_t iter = vs.begin (); iter != vs.end ();)
     {
@@ -80,16 +80,16 @@ operator<< (std::ostream& os, const SPFVertex::ListOfSPFVertex_t& vs)
 
 // ---------------------------------------------------------------------------
 //
-// SPFVertex Implementation
+// DSRVertex Implementation
 //
 // ---------------------------------------------------------------------------
 
-SPFVertex::SPFVertex () : 
+DSRVertex::DSRVertex () : 
   m_vertexType (VertexUnknown), 
   m_vertexId ("255.255.255.255"), 
   m_lsa (0),
-  m_distanceFromRoot (SPF_INFINITY), 
-  m_rootOif (SPF_INFINITY),
+  m_distanceFromRoot (DISTINFINITY), 
+  m_rootOif (DISTINFINITY),
   m_nextHop ("0.0.0.0"),
   m_parents (),
   m_children (),
@@ -98,11 +98,11 @@ SPFVertex::SPFVertex () :
   NS_LOG_FUNCTION (this);
 }
 
-SPFVertex::SPFVertex (DSRRoutingLSA* lsa) : 
+DSRVertex::DSRVertex (DSRRoutingLSA* lsa) : 
   m_vertexId (lsa->GetLinkStateId ()),
   m_lsa (lsa),
-  m_distanceFromRoot (SPF_INFINITY), 
-  m_rootOif (SPF_INFINITY),
+  m_distanceFromRoot (DISTINFINITY), 
+  m_rootOif (DISTINFINITY),
   m_nextHop ("0.0.0.0"),
   m_parents (),
   m_children (),
@@ -113,16 +113,16 @@ SPFVertex::SPFVertex (DSRRoutingLSA* lsa) :
   if (lsa->GetLSType () == DSRRoutingLSA::RouterLSA) 
     {
       NS_LOG_LOGIC ("Setting m_vertexType to VertexRouter");
-      m_vertexType = SPFVertex::VertexRouter;
+      m_vertexType = DSRVertex::VertexRouter;
     }
   else if (lsa->GetLSType () == DSRRoutingLSA::NetworkLSA) 
     { 
       NS_LOG_LOGIC ("Setting m_vertexType to VertexNetwork");
-      m_vertexType = SPFVertex::VertexNetwork;
+      m_vertexType = DSRVertex::VertexNetwork;
     }
 }
 
-SPFVertex::~SPFVertex ()
+DSRVertex::~DSRVertex ()
 {
   NS_LOG_FUNCTION (this);
 
@@ -131,7 +131,7 @@ SPFVertex::~SPFVertex ()
 
   // find this node from all its parents and remove the entry of this node
   // from all its parents
-  for (ListOfSPFVertex_t::iterator piter = m_parents.begin (); 
+  for (ListOfDSRVertex_t::iterator piter = m_parents.begin (); 
        piter != m_parents.end ();
        piter++)
     {
@@ -157,7 +157,7 @@ SPFVertex::~SPFVertex ()
       //
       // Note that m_children.pop_front () is not necessary as this
       // p is removed from the children list when p is deleted
-      SPFVertex* p = m_children.front ();
+      DSRVertex* p = m_children.front ();
       // 'p' == 0, this child is already deleted by its other parent
       if (p == 0) continue;
       NS_LOG_LOGIC ("Parent vertex-" << m_vertexId << " deleting its child vertex-" << p->GetVertexId ());
@@ -174,63 +174,63 @@ SPFVertex::~SPFVertex ()
 }
 
 void
-SPFVertex::SetVertexType (SPFVertex::VertexType type)
+DSRVertex::SetVertexType (DSRVertex::VertexType type)
 {
   NS_LOG_FUNCTION (this << type);
   m_vertexType = type;
 }
 
-SPFVertex::VertexType
-SPFVertex::GetVertexType (void) const
+DSRVertex::VertexType
+DSRVertex::GetVertexType (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_vertexType;
 }
 
 void
-SPFVertex::SetVertexId (Ipv4Address id)
+DSRVertex::SetVertexId (Ipv4Address id)
 {
   NS_LOG_FUNCTION (this << id);
   m_vertexId = id;
 }
 
 Ipv4Address
-SPFVertex::GetVertexId (void) const
+DSRVertex::GetVertexId (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_vertexId;
 }
 
 void
-SPFVertex::SetLSA (DSRRoutingLSA* lsa)
+DSRVertex::SetLSA (DSRRoutingLSA* lsa)
 {
   NS_LOG_FUNCTION (this << lsa);
   m_lsa = lsa;
 }
 
 DSRRoutingLSA*
-SPFVertex::GetLSA (void) const
+DSRVertex::GetLSA (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_lsa;
 }
 
 void
-SPFVertex::SetDistanceFromRoot (uint32_t distance)
+DSRVertex::SetDistanceFromRoot (uint32_t distance)
 {
   NS_LOG_FUNCTION (this << distance);
   m_distanceFromRoot = distance;
 }
 
 uint32_t
-SPFVertex::GetDistanceFromRoot (void) const
+DSRVertex::GetDistanceFromRoot (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_distanceFromRoot;
 }
 
 void
-SPFVertex::SetParent (SPFVertex* parent)
+DSRVertex::SetParent (DSRVertex* parent)
 {
   NS_LOG_FUNCTION (this << parent);
 
@@ -239,18 +239,18 @@ SPFVertex::SetParent (SPFVertex* parent)
   m_parents.push_back (parent);
 }
 
-SPFVertex*
-SPFVertex::GetParent (uint32_t i) const
+DSRVertex*
+DSRVertex::GetParent (uint32_t i) const
 {
   NS_LOG_FUNCTION (this << i);
 
   // If the index i is out-of-range, return 0 and do nothing
   if (m_parents.size () <= i)
     {
-      NS_LOG_LOGIC ("Index to SPFVertex's parent is out-of-range.");
+      NS_LOG_LOGIC ("Index to DSRVertex's parent is out-of-range.");
       return 0;
     }
-  ListOfSPFVertex_t::const_iterator iter = m_parents.begin ();
+  ListOfDSRVertex_t::const_iterator iter = m_parents.begin ();
   while (i-- > 0) 
     {
       iter++;
@@ -259,7 +259,7 @@ SPFVertex::GetParent (uint32_t i) const
 }
 
 void 
-SPFVertex::MergeParent (const SPFVertex* v)
+DSRVertex::MergeParent (const DSRVertex* v)
 {
   NS_LOG_FUNCTION (this << v);
 
@@ -274,7 +274,7 @@ SPFVertex::MergeParent (const SPFVertex* v)
 }
 
 void 
-SPFVertex::SetRootExitDirection (Ipv4Address nextHop, int32_t id)
+DSRVertex::SetRootExitDirection (Ipv4Address nextHop, int32_t id)
 {
   NS_LOG_FUNCTION (this << nextHop << id);
 
@@ -288,27 +288,27 @@ SPFVertex::SetRootExitDirection (Ipv4Address nextHop, int32_t id)
 }
 
 void 
-SPFVertex::SetRootExitDirection (SPFVertex::NodeExit_t exit)
+DSRVertex::SetRootExitDirection (DSRVertex::NodeExit_t exit)
 {
   NS_LOG_FUNCTION (this << exit);
   SetRootExitDirection (exit.first, exit.second);
 }
 
-SPFVertex::NodeExit_t
-SPFVertex::GetRootExitDirection (uint32_t i) const
+DSRVertex::NodeExit_t
+DSRVertex::GetRootExitDirection (uint32_t i) const
 {
   NS_LOG_FUNCTION (this << i);
   typedef ListOfNodeExit_t::const_iterator CIter_t;
 
-  NS_ASSERT_MSG (i < m_ecmpRootExits.size (), "Index out-of-range when accessing SPFVertex::m_ecmpRootExits!");
+  NS_ASSERT_MSG (i < m_ecmpRootExits.size (), "Index out-of-range when accessing DSRVertex::m_ecmpRootExits!");
   CIter_t iter = m_ecmpRootExits.begin ();
   while (i-- > 0) { iter++; }
 
   return *iter;
 }
 
-SPFVertex::NodeExit_t 
-SPFVertex::GetRootExitDirection () const
+DSRVertex::NodeExit_t 
+DSRVertex::GetRootExitDirection () const
 {
   NS_LOG_FUNCTION (this);
 
@@ -317,7 +317,7 @@ SPFVertex::GetRootExitDirection () const
 }
 
 void 
-SPFVertex::MergeRootExitDirections (const SPFVertex* vertex)
+DSRVertex::MergeRootExitDirections (const DSRVertex* vertex)
 {
   NS_LOG_FUNCTION (this << vertex);
 
@@ -332,7 +332,7 @@ SPFVertex::MergeRootExitDirections (const SPFVertex* vertex)
 }
 
 void 
-SPFVertex::InheritAllRootExitDirections (const SPFVertex* vertex)
+DSRVertex::InheritAllRootExitDirections (const DSRVertex* vertex)
 {
   NS_LOG_FUNCTION (this << vertex);
 
@@ -348,26 +348,26 @@ SPFVertex::InheritAllRootExitDirections (const SPFVertex* vertex)
 }
 
 uint32_t 
-SPFVertex::GetNRootExitDirections () const
+DSRVertex::GetNRootExitDirections () const
 {
   NS_LOG_FUNCTION (this);
   return m_ecmpRootExits.size ();
 }
 
 uint32_t 
-SPFVertex::GetNChildren (void) const
+DSRVertex::GetNChildren (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_children.size ();
 }
 
-SPFVertex*
-SPFVertex::GetChild (uint32_t n) const
+DSRVertex*
+DSRVertex::GetChild (uint32_t n) const
 {
   NS_LOG_FUNCTION (this << n);
   uint32_t j = 0;
 
-  for ( ListOfSPFVertex_t::const_iterator i = m_children.begin ();
+  for ( ListOfDSRVertex_t::const_iterator i = m_children.begin ();
         i != m_children.end ();
         i++, j++)
     {
@@ -381,7 +381,7 @@ SPFVertex::GetChild (uint32_t n) const
 }
 
 uint32_t
-SPFVertex::AddChild (SPFVertex* child)
+DSRVertex::AddChild (DSRVertex* child)
 {
   NS_LOG_FUNCTION (this << child);
   m_children.push_back (child);
@@ -389,21 +389,21 @@ SPFVertex::AddChild (SPFVertex* child)
 }
 
 void 
-SPFVertex::SetVertexProcessed (bool value)
+DSRVertex::SetVertexProcessed (bool value)
 {
   NS_LOG_FUNCTION (this << value);
   m_vertexProcessed = value;
 }
 
 bool 
-SPFVertex::IsVertexProcessed (void) const
+DSRVertex::IsVertexProcessed (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_vertexProcessed;
 }
 
 void
-SPFVertex::ClearVertexProcessed (void)
+DSRVertex::ClearVertexProcessed (void)
 {
   NS_LOG_FUNCTION (this);
   for (uint32_t i = 0; i < this->GetNChildren (); i++)
@@ -785,27 +785,27 @@ DSRRouteManagerImpl::InitializeRoutes ()
       // if the node has a DSR router interface, then run the DSR routing
       // algorithms.
       //
-        SPFVertex *v;
+        DSRVertex *v;
         DSRRoutingLSA* w_lsa = 0;
         DSRRoutingLinkRecord *l = 0;
         uint32_t numRecordsInVertex = 0;
-        v = new SPFVertex (m_lsdb->GetLSA(rtr->GetRouterId ()));
+        v = new DSRVertex (m_lsdb->GetLSA(rtr->GetRouterId ()));
         //
         // V points to a Router-LSA or Network-LSA
         // Loop over the links in router LSA or attached routers in Network LSA
         //
-        if (v->GetVertexType () == SPFVertex::VertexRouter)
+        if (v->GetVertexType () == DSRVertex::VertexRouter)
           {
             numRecordsInVertex = v->GetLSA ()->GetNLinkRecords (); 
           }
-        if (v->GetVertexType () == SPFVertex::VertexNetwork)
+        if (v->GetVertexType () == DSRVertex::VertexNetwork)
           {
             numRecordsInVertex = v->GetLSA ()->GetNAttachedRouters (); 
           }
         for (uint32_t i = 0; i < numRecordsInVertex; i++)
           {
             // std::cout << "i = " << i << std::endl;
-            if (v->GetVertexType () == SPFVertex::VertexRouter) 
+            if (v->GetVertexType () == DSRVertex::VertexRouter) 
               {
                 NS_LOG_LOGIC ("Examining link " << i << " of " << 
                       v->GetVertexId () << "'s " <<
@@ -845,7 +845,7 @@ DSRRouteManagerImpl::InitializeRoutes ()
                   Ptr<Ipv4DSRRouting> gr = router->GetRoutingProtocol ();
                   NS_ASSERT (gr);
                   DSRRoutingLinkRecord *linkRemote =0;
-                  SPFVertex* w = new SPFVertex (w_lsa);
+                  DSRVertex* w = new DSRVertex (w_lsa);
                   linkRemote = SPFGetNextLink (w, v, linkRemote);
                   Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
                   int32_t Iface = ipv4->GetInterfaceForAddress (l->GetLinkData ());
@@ -886,11 +886,11 @@ DSRRouteManagerImpl::InitializeRoutes ()
 // vertex already on the candidate list, store the new (lower) cost.
 //
 void
-DSRRouteManagerImpl::SPFNext (SPFVertex* v, CandidateQueue& candidate)
+DSRRouteManagerImpl::SPFNext (DSRVertex* v, DsrCandidateQueue& candidate)
 {
   NS_LOG_FUNCTION (this << v << &candidate);
 
-  SPFVertex* w = 0;
+  DSRVertex* w = 0;
   DSRRoutingLSA* w_lsa = 0;
   DSRRoutingLinkRecord *l = 0;
   uint32_t distance = 0;
@@ -899,11 +899,11 @@ DSRRouteManagerImpl::SPFNext (SPFVertex* v, CandidateQueue& candidate)
 // V points to a Router-LSA or Network-LSA
 // Loop over the links in router LSA or attached routers in Network LSA
 //
-  if (v->GetVertexType () == SPFVertex::VertexRouter)
+  if (v->GetVertexType () == DSRVertex::VertexRouter)
     {
       numRecordsInVertex = v->GetLSA ()->GetNLinkRecords (); 
     }
-  if (v->GetVertexType () == SPFVertex::VertexNetwork)
+  if (v->GetVertexType () == DSRVertex::VertexNetwork)
     {
       numRecordsInVertex = v->GetLSA ()->GetNAttachedRouters (); 
     }
@@ -911,7 +911,7 @@ DSRRouteManagerImpl::SPFNext (SPFVertex* v, CandidateQueue& candidate)
   for (uint32_t i = 0; i < numRecordsInVertex; i++)
     {
 // Get w_lsa:  In case of V is Router-LSA
-      if (v->GetVertexType () == SPFVertex::VertexRouter) 
+      if (v->GetVertexType () == DSRVertex::VertexRouter) 
         {
           NS_LOG_LOGIC ("Examining link " << i << " of " << 
                         v->GetVertexId () << "'s " <<
@@ -958,7 +958,7 @@ DSRRouteManagerImpl::SPFNext (SPFVertex* v, CandidateQueue& candidate)
             }
         }
 // Get w_lsa:  In case of V is Network-LSA
-      if (v->GetVertexType () == SPFVertex::VertexNetwork) 
+      if (v->GetVertexType () == DSRVertex::VertexNetwork) 
         {
           w_lsa = m_lsdb->GetLSAByLinkData 
               (v->GetLSA ()->GetAttachedRouter (i));
@@ -1012,7 +1012,7 @@ DSRRouteManagerImpl::SPFNext (SPFVertex* v, CandidateQueue& candidate)
 // used to forward the packets.
 
 // prepare vertex w
-          w = new SPFVertex (w_lsa);
+          w = new DSRVertex (w_lsa);
           if (SPFNexthopCalculation (v, w, l, distance))
             {
               w_lsa->SetStatus (DSRRoutingLSA::LSA_SPF_CANDIDATE);
@@ -1045,7 +1045,7 @@ DSRRouteManagerImpl::SPFNext (SPFVertex* v, CandidateQueue& candidate)
 * with the cost we just determined (w->distance) to see
 * if we've found a shorter path.
 */
-          SPFVertex* cw;
+          DSRVertex* cw;
           cw = candidate.Find (w_lsa->GetLinkStateId ());
           if (cw->GetDistanceFromRoot () < distance)
             {
@@ -1076,14 +1076,14 @@ DSRRouteManagerImpl::SPFNext (SPFVertex* v, CandidateQueue& candidate)
 // is very different from quagga (blame ns3::DSRRouteManagerImpl)
 
 // prepare vertex w
-              w = new SPFVertex (w_lsa);
+              w = new DSRVertex (w_lsa);
               SPFNexthopCalculation (v, w, l, distance);
               cw->MergeRootExitDirections (w);
               cw->MergeParent (w);
-// SPFVertexAddParent (w) is necessary as the destructor of 
-// SPFVertex checks if the vertex and its parent is linked
+// DSRVertexAddParent (w) is necessary as the destructor of 
+// DSRVertex checks if the vertex and its parent is linked
 // bidirectionally
-              SPFVertexAddParent (w);
+              DSRVertexAddParent (w);
               delete w;
             }
           else // cw->GetDistanceFromRoot () > w->GetDistanceFromRoot ()
@@ -1121,8 +1121,8 @@ DSRRouteManagerImpl::SPFNext (SPFVertex* v, CandidateQueue& candidate)
 //
 int
 DSRRouteManagerImpl::SPFNexthopCalculation (
-  SPFVertex* v, 
-  SPFVertex* w,
+  DSRVertex* v, 
+  DSRVertex* w,
   DSRRoutingLinkRecord* l,
   uint32_t distance)
 {
@@ -1130,7 +1130,7 @@ DSRRouteManagerImpl::SPFNexthopCalculation (
 //
 // If w is a NetworkVertex, l should be null
 /*
-  if (w->GetVertexType () == SPFVertex::VertexNetwork && l)
+  if (w->GetVertexType () == DSRVertex::VertexNetwork && l)
     {
         NS_ASSERT_MSG (0, "Error:  SPFNexthopCalculation parameter problem");
     }
@@ -1169,7 +1169,7 @@ DSRRouteManagerImpl::SPFNexthopCalculation (
 // node if this root node is a router.  We then need to see if this node <w>
 // is a router.
 //
-      if (w->GetVertexType () == SPFVertex::VertexRouter) 
+      if (w->GetVertexType () == DSRVertex::VertexRouter) 
         {
 //
 // In the case of point-to-point links, the link data field (m_linkData) of a
@@ -1217,7 +1217,7 @@ DSRRouteManagerImpl::SPFNexthopCalculation (
         }  // end W is a router vertes
       else 
         {
-          NS_ASSERT (w->GetVertexType () == SPFVertex::VertexNetwork);
+          NS_ASSERT (w->GetVertexType () == DSRVertex::VertexNetwork);
 // W is a directly connected network; no next hop is required
           DSRRoutingLSA* w_lsa = w->GetLSA ();
           NS_ASSERT (w_lsa->GetLSType () == DSRRoutingLSA::NetworkLSA);
@@ -1236,7 +1236,7 @@ DSRRouteManagerImpl::SPFNexthopCalculation (
           return 1;
         }
     } // end v is the root
-  else if (v->GetVertexType () == SPFVertex::VertexNetwork) 
+  else if (v->GetVertexType () == DSRVertex::VertexNetwork) 
     {
 // See if any of v's parents are the root
       if (v->GetParent () == m_spfroot)
@@ -1245,7 +1245,7 @@ DSRRouteManagerImpl::SPFNexthopCalculation (
 // directly connects the calculating router to the destination
 // router.  The list of next hops is then determined by
 // examining the destination's router-LSA...
-          NS_ASSERT (w->GetVertexType () == SPFVertex::VertexRouter);
+          NS_ASSERT (w->GetVertexType () == DSRVertex::VertexRouter);
           DSRRoutingLinkRecord *linkRemote = 0;
           while ((linkRemote = SPFGetNextLink (w, v, linkRemote)))
             {
@@ -1309,8 +1309,8 @@ DSRRouteManagerImpl::SPFNexthopCalculation (
 //
 DSRRoutingLinkRecord*
 DSRRouteManagerImpl::SPFGetNextLink (
-  SPFVertex* v,
-  SPFVertex* w,
+  DSRVertex* v,
+  DSRVertex* w,
   DSRRoutingLinkRecord* prev_link) 
 {
   NS_LOG_FUNCTION (this << v << w << prev_link);
@@ -1485,31 +1485,31 @@ DSRRouteManagerImpl::SPFCalculate (Ipv4Address root, Ipv4Address initroot, DSRRo
 {
   NS_LOG_FUNCTION (this << root);
   // std::cout << "The interface = " << Iface << std::endl;
-  SPFVertex *v;
+  DSRVertex *v;
 //
 // Initialize the Link State Database.
 //
   m_lsdb->Initialize ();
 //
-// The candidate queue is a priority queue of SPFVertex objects, with the top
+// The candidate queue is a priority queue of DSRVertex objects, with the top
 // of the queue being the closest vertex in terms of distance from the root
 // of the tree.  Initially, this queue is empty.
 //
-  CandidateQueue candidate;
+  DsrCandidateQueue candidate;
   NS_ASSERT (candidate.Size () == 0);
 //
 // Initialize the shortest-path tree to only contain the router doing the 
 // calculation.  Each router (and corresponding network) is a vertex in the
 // shortest path first (SPF) tree.
 //
-  v = new SPFVertex (m_lsdb->GetLSA (root));
+  v = new DSRVertex (m_lsdb->GetLSA (root));
 
 /**
  * @brief add the initroot for dsr
  * \author Pu Yang
  */
-  SPFVertex *v_init;
-  v_init = new SPFVertex (m_lsdb->GetLSA (initroot));
+  DSRVertex *v_init;
+  v_init = new DSRVertex (m_lsdb->GetLSA (initroot));
 // 
 // This vertex is the root of the SPF tree and it is distance 0 from the root.
 // We also mark this vertex as being in the SPF tree.
@@ -1566,7 +1566,7 @@ DSRRouteManagerImpl::SPFCalculate (Ipv4Address root, Ipv4Address initroot, DSRRo
 // root, and add it to the shortest-path tree (removing it from the candidate
 // list in the process).
 //
-// Recall that in the previous step, we created SPFVertex structures for each
+// Recall that in the previous step, we created DSRVertex structures for each
 // of the routers found in the Global Router Link Records and added tehm to 
 // the candidate list.
 //
@@ -1585,7 +1585,7 @@ DSRRouteManagerImpl::SPFCalculate (Ipv4Address root, Ipv4Address initroot, DSRRo
 // SPFNext, the parent pointer was set but the vertex has been orphaned up
 // to now.
 //
-      SPFVertexAddParent (v);
+      DSRVertexAddParent (v);
 //
 // Note that when there is a choice of vertices closest to the root, network
 // vertices must be chosen before router vertices in order to necessarily
@@ -1614,17 +1614,17 @@ DSRRouteManagerImpl::SPFCalculate (Ipv4Address root, Ipv4Address initroot, DSRRo
 // through its point-to-point links, adding a *host* route to the local IP
 // address (at the <v> side) for each of those links.
 //
-      if (v->GetVertexType () == SPFVertex::VertexRouter)
+      if (v->GetVertexType () == DSRVertex::VertexRouter)
         {
           SPFIntraAddRouter (v, v_init, l->GetLinkData (), Iface);
         }
-      else if (v->GetVertexType () == SPFVertex::VertexNetwork)
+      else if (v->GetVertexType () == DSRVertex::VertexNetwork)
         {
           SPFIntraAddTransit (v);
         }
       else
         {
-          NS_ASSERT_MSG (0, "illegal SPFVertex type");
+          NS_ASSERT_MSG (0, "illegal DSRVertex type");
         }
 //
 // RFC2328 16.1. (5). 
@@ -1654,14 +1654,14 @@ DSRRouteManagerImpl::SPFCalculate (Ipv4Address root, Ipv4Address initroot, DSRRo
 }
 
 void
-DSRRouteManagerImpl::ProcessASExternals (SPFVertex* v, DSRRoutingLSA* extlsa)
+DSRRouteManagerImpl::ProcessASExternals (DSRVertex* v, DSRRoutingLSA* extlsa)
 {
   NS_LOG_FUNCTION (this << v << extlsa);
   NS_LOG_LOGIC ("Processing external for destination " << 
                 extlsa->GetLinkStateId () <<
                 ", for router "  << v->GetVertexId () <<
                 ", advertised by " << extlsa->GetAdvertisingRouter ());
-  if (v->GetVertexType () == SPFVertex::VertexRouter)
+  if (v->GetVertexType () == DSRVertex::VertexRouter)
     {
       DSRRoutingLSA *rlsa = v->GetLSA ();
       NS_LOG_LOGIC ("Processing router LSA with id " << rlsa->GetLinkStateId ());
@@ -1688,7 +1688,7 @@ DSRRouteManagerImpl::ProcessASExternals (SPFVertex* v, DSRRoutingLSA* extlsa)
 //
 
 void
-DSRRouteManagerImpl::SPFAddASExternal (DSRRoutingLSA *extlsa, SPFVertex *v)
+DSRRouteManagerImpl::SPFAddASExternal (DSRRoutingLSA *extlsa, DSRVertex *v)
 {
   NS_LOG_FUNCTION (this << extlsa << v);
 
@@ -1757,7 +1757,7 @@ DSRRouteManagerImpl::SPFAddASExternal (DSRRoutingLSA *extlsa, SPFVertex *v)
 //
           NS_ASSERT_MSG (v->GetLSA (), 
                          "DSRRouteManagerImpl::SPFIntraAddRouter (): "
-                         "Expected valid LSA in SPFVertex* v");
+                         "Expected valid LSA in DSRVertex* v");
           Ipv4Mask tempmask = extlsa->GetNetworkLSANetworkMask ();
           Ipv4Address tempip = extlsa->GetLinkStateId ();
           tempip = tempip.CombineMask (tempmask);
@@ -1786,7 +1786,7 @@ DSRRouteManagerImpl::SPFAddASExternal (DSRRoutingLSA *extlsa, SPFVertex *v)
           // the stub network gateway 'v' from the root node
           for (uint32_t i = 0; i < v->GetNRootExitDirections (); i++)
             {
-              SPFVertex::NodeExit_t exit = v->GetRootExitDirection (i);
+              DSRVertex::NodeExit_t exit = v->GetRootExitDirection (i);
               Ipv4Address nextHop = exit.first;
               int32_t outIf = exit.second;
               /**
@@ -1822,11 +1822,11 @@ DSRRouteManagerImpl::SPFAddASExternal (DSRRoutingLSA *extlsa, SPFVertex *v)
 // stub link records will exist for point-to-point interfaces and for
 // broadcast interfaces for which no neighboring router can be found
 void
-DSRRouteManagerImpl::SPFProcessStubs (SPFVertex* v)
+DSRRouteManagerImpl::SPFProcessStubs (DSRVertex* v)
 {
   NS_LOG_FUNCTION (this << v);
   NS_LOG_LOGIC ("Processing stubs for " << v->GetVertexId ());
-  if (v->GetVertexType () == SPFVertex::VertexRouter)
+  if (v->GetVertexType () == DSRVertex::VertexRouter)
     {
       DSRRoutingLSA *rlsa = v->GetLSA ();
       NS_LOG_LOGIC ("Processing router LSA with id " << rlsa->GetLinkStateId ());
@@ -1856,7 +1856,7 @@ DSRRouteManagerImpl::SPFProcessStubs (SPFVertex* v)
 
 // RFC2328 16.1. second stage. 
 void
-DSRRouteManagerImpl::SPFIntraAddStub (DSRRoutingLinkRecord *l, SPFVertex* v)
+DSRRouteManagerImpl::SPFIntraAddStub (DSRRoutingLinkRecord *l, DSRVertex* v)
 {
   NS_LOG_FUNCTION (this << l << v);
 
@@ -1935,7 +1935,7 @@ DSRRouteManagerImpl::SPFIntraAddStub (DSRRoutingLinkRecord *l, SPFVertex* v)
 //
           NS_ASSERT_MSG (v->GetLSA (), 
                          "DSRRouteManagerImpl::SPFIntraAddRouter (): "
-                         "Expected valid LSA in SPFVertex* v");
+                         "Expected valid LSA in DSRVertex* v");
           Ipv4Mask tempmask (l->GetLinkData ().Get ());
           Ipv4Address tempip = l->GetLinkId ();
           tempip = tempip.CombineMask (tempmask);
@@ -1964,7 +1964,7 @@ DSRRouteManagerImpl::SPFIntraAddStub (DSRRoutingLinkRecord *l, SPFVertex* v)
           // the stub network gateway 'v' from the root node
           for (uint32_t i = 0; i < v->GetNRootExitDirections (); i++)
             {
-              SPFVertex::NodeExit_t exit = v->GetRootExitDirection (i);
+              DSRVertex::NodeExit_t exit = v->GetRootExitDirection (i);
               Ipv4Address nextHop = exit.first;
               int32_t outIf = exit.second;
               if (outIf >= 0)
@@ -2083,7 +2083,7 @@ DSRRouteManagerImpl::FindOutgoingInterfaceId (Ipv4Address a, Ipv4Mask amask)
 // route.
 //
 void
-DSRRouteManagerImpl::SPFIntraAddRouter (SPFVertex* v, SPFVertex* v_init, Ipv4Address nextHop, uint32_t Iface)
+DSRRouteManagerImpl::SPFIntraAddRouter (DSRVertex* v, DSRVertex* v_init, Ipv4Address nextHop, uint32_t Iface)
 {
   NS_LOG_FUNCTION (this << v);
 
@@ -2160,7 +2160,7 @@ DSRRouteManagerImpl::SPFIntraAddRouter (SPFVertex* v, SPFVertex* v_init, Ipv4Add
           DSRRoutingLSA *lsa = v->GetLSA ();
           NS_ASSERT_MSG (lsa, 
                          "DSRRouteManagerImpl::SPFIntraAddRouter (): "
-                         "Expected valid LSA in SPFVertex* v");
+                         "Expected valid LSA in DSRVertex* v");
 
           uint32_t nLinkRecords = lsa->GetNLinkRecords ();
 //
@@ -2201,7 +2201,7 @@ DSRRouteManagerImpl::SPFIntraAddRouter (SPFVertex* v, SPFVertex* v_init, Ipv4Add
     }
 }
 void
-DSRRouteManagerImpl::SPFIntraAddTransit (SPFVertex* v)
+DSRRouteManagerImpl::SPFIntraAddTransit (DSRVertex* v)
 {
   NS_LOG_FUNCTION (this << v);
 
@@ -2269,7 +2269,7 @@ DSRRouteManagerImpl::SPFIntraAddTransit (SPFVertex* v)
           DSRRoutingLSA *lsa = v->GetLSA ();
           NS_ASSERT_MSG (lsa, 
                          "DSRRouteManagerImpl::SPFIntraAddTransit (): "
-                         "Expected valid LSA in SPFVertex* v");
+                         "Expected valid LSA in DSRVertex* v");
           Ipv4Mask tempmask = lsa->GetNetworkLSANetworkMask ();
           Ipv4Address tempip = lsa->GetLinkStateId ();
           tempip = tempip.CombineMask (tempmask);
@@ -2285,7 +2285,7 @@ DSRRouteManagerImpl::SPFIntraAddTransit (SPFVertex* v)
           // the vertex 'v'
           for (uint32_t i = 0; i < v->GetNRootExitDirections (); i++)
             {
-              SPFVertex::NodeExit_t exit = v->GetRootExitDirection (i);
+              DSRVertex::NodeExit_t exit = v->GetRootExitDirection (i);
               Ipv4Address nextHop = exit.first;
               int32_t outIf = exit.second;
 
@@ -2319,13 +2319,13 @@ DSRRouteManagerImpl::SPFIntraAddTransit (SPFVertex* v)
 // already has set and adds itself to that vertex's list of children.
 //
 void
-DSRRouteManagerImpl::SPFVertexAddParent (SPFVertex* v)
+DSRRouteManagerImpl::DSRVertexAddParent (DSRVertex* v)
 {
   NS_LOG_FUNCTION (this << v);
 
   for (uint32_t i=0;;)
     {
-      SPFVertex* parent;
+      DSRVertex* parent;
       // check if all parents of vertex v
       if ((parent = v->GetParent (i++)) == 0) break;
       parent->AddChild (v);

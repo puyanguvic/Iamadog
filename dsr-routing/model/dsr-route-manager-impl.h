@@ -36,7 +36,7 @@ namespace ns3 {
 
 const uint32_t DISTINFINITY = 0xffffffff; //!< "infinite" distance between nodes
 
-class CandidateQueue;
+class DsrCandidateQueue;
 class Ipv4DSRRouting;
 
 /**
@@ -921,7 +921,7 @@ private:
    * \param v the vertex
    * \param candidate the SPF candidate queue
    */
-  void SPFNext (DSRVertex* v, CandidateQueue& candidate);
+  void SPFNext (DSRVertex* v, DsrCandidateQueue& candidate);
 
   /**
    * \brief Calculate nexthop from root through V (parent) to vertex W (destination)

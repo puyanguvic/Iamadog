@@ -18,8 +18,8 @@
  * Author:  Craig Dowell (craigdo@ee.washington.edu)
  */
 
-#ifndef CANDIDATE_QUEUE_H
-#define CANDIDATE_QUEUE_H
+#ifndef DSR_CANDIDATE_QUEUE_H
+#define DSR_CANDIDATE_QUEUE_H
 
 #include <stdint.h>
 #include <list>
@@ -27,7 +27,7 @@
 
 namespace ns3 {
 
-class SPFVertex;
+class DSRVertex;
 
 /**
  * \ingroup globalrouting
@@ -48,29 +48,29 @@ class SPFVertex;
  * requirement for a Reorder () operation led us to implement this simple 
  * enhanced priority queue.
  */
-class CandidateQueue
+class DsrCandidateQueue
 {
 public:
 /**
  * @brief Create an empty SPF Candidate Queue.
  *
- * @see SPFVertex
+ * @see DSRVertex
  */
-  CandidateQueue ();
+  DsrCandidateQueue ();
 
 /**
  * @brief Destroy an SPF Candidate Queue and release any resources held 
  * by the contents.
  *
- * @see SPFVertex
+ * @see DSRVertex
  */
-  virtual ~CandidateQueue ();
+  virtual ~DsrCandidateQueue ();
 
 /**
  * @brief Empty the Candidate Queue and release all of the resources 
  * associated with the Shortest Path First Vertex pointers in the queue.
  *
- * @see SPFVertex
+ * @see DSRVertex
  */
   void Clear (void);
 
@@ -83,10 +83,10 @@ public:
  * m_distanceFromRoot.  Remaining vertices are ordered according to 
  * increasing distance.
  *
- * @see SPFVertex
+ * @see DSRVertex
  * @param vNew The Shortest Path First Vertex to add to the queue.
  */
-  void Push (SPFVertex *vNew);
+  void Push (DSRVertex *vNew);
 
 /**
  * @brief Pop the Shortest Path First Vertex pointer at the top of the queue.
@@ -94,24 +94,24 @@ public:
  * The caller is given the responsibility for releasing the resources 
  * associated with the vertex.
  *
- * @see SPFVertex
+ * @see DSRVertex
  * @see Top ()
  * @returns The Shortest Path First Vertex pointer at the top of the queue.
  */
-  SPFVertex* Pop (void);
+  DSRVertex* Pop (void);
 
 /**
  * @brief Return the Shortest Path First Vertex pointer at the top of the 
  * queue.
  *
- * This method does not pop the SPFVertex* off of the queue, it simply 
+ * This method does not pop the DSRVertex* off of the queue, it simply 
  * returns the pointer.
  *
- * @see SPFVertex
+ * @see DSRVertex
  * @see Pop ()
  * @returns The Shortest Path First Vertex pointer at the top of the queue.
  */
-  SPFVertex* Top (void) const;
+  DSRVertex* Top (void) const;
 
 /**
  * @brief Test the Candidate Queue to determine if it is empty.
@@ -124,8 +124,8 @@ public:
  * @brief Return the number of Shortest Path First Vertex pointers presently
  * stored in the Candidate Queue.
  *
- * @see SPFVertex
- * @returns The number of SPFVertex* pointers in the Candidate Queue.
+ * @see DSRVertex
+ * @returns The number of DSRVertex* pointers in the Candidate Queue.
  */
   uint32_t Size (void) const;
 
@@ -133,11 +133,11 @@ public:
  * @brief Searches the Candidate Queue for a Shortest Path First Vertex 
  * pointer that points to a vertex having the given IP address.
  *
- * @see SPFVertex
+ * @see DSRVertex
  * @param addr The IP address to search for.
- * @returns The SPFVertex* pointer corresponding to the given IP address.
+ * @returns The DSRVertex* pointer corresponding to the given IP address.
  */
-  SPFVertex* Find (const Ipv4Address addr) const;
+  DSRVertex* Find (const Ipv4Address addr) const;
 
 /**
  * @brief Reorders the Candidate Queue according to the priority scheme.
@@ -150,7 +150,7 @@ public:
  * This method is provided in case the values of m_distanceFromRoot change
  * during the routing calculations.
  *
- * @see SPFVertex
+ * @see DSRVertex
  */
   void Reorder (void);
 
@@ -161,7 +161,7 @@ private:
  * properly deal with deep copies.
  * \param sr object to copy
  */
-  CandidateQueue (CandidateQueue& sr);
+  DsrCandidateQueue (DsrCandidateQueue& sr);
 
 /**
  * Candidate Queue assignment operator is disallowed (not implemented) to
@@ -170,11 +170,11 @@ private:
  * \param sr object to assign
  * \return copied object
  */
-  CandidateQueue& operator= (CandidateQueue& sr);
+  DsrCandidateQueue& operator= (DsrCandidateQueue& sr);
 /**
  * \brief return true if v1 < v2
  *
- * SPFVertexes are added into the queue according to the ordering
+ * DSRVertexes are added into the queue according to the ordering
  * defined by this method. If v1 should be popped before v2, this 
  * method return true; false otherwise
  *
@@ -182,10 +182,10 @@ private:
  * \param v2 second operand
  * \return True if v1 should be popped before v2; false otherwise
  */
-  static bool CompareSPFVertex (const SPFVertex* v1, const SPFVertex* v2);
+  static bool CompareDSRVertex (const DSRVertex* v1, const DSRVertex* v2);
 
-  typedef std::list<SPFVertex*> CandidateList_t; //!< container of SPFVertex pointers
-  CandidateList_t m_candidates;  //!< SPFVertex candidates
+  typedef std::list<DSRVertex*> DsrCandidateList_t; //!< container of DSRVertex pointers
+  DsrCandidateList_t m_candidates;  //!< DSRVertex candidates
 
   /**
    * \brief Stream insertion operator.
@@ -194,7 +194,7 @@ private:
    * \param q the CandidateQueue
    * \returns the reference to the output stream
    */
-  friend std::ostream& operator<< (std::ostream& os, const CandidateQueue& q);
+  friend std::ostream& operator<< (std::ostream& os, const DsrCandidateQueue& q);
 };
 
 } // namespace ns3
