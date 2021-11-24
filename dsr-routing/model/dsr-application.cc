@@ -7,7 +7,11 @@
 #include "ns3/applications-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/flow-monitor-module.h"
-#include "ns3/dsr-tags-module.h"
+#include "timestamp-tag.h"
+#include "priority-tag.h"
+#include "cost-tag.h"
+#include "budget-tag.h"
+#include "flag-tag.h"
 #include "dsr-application.h"
 
 

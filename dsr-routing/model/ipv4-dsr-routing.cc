@@ -30,11 +30,7 @@
 #include "ns3/node.h"
 #include "ipv4-dsr-routing.h"
 #include "dsr-route-manager.h"
-
-/**
- * \author Pu Yang
-*/
-#include "ns3/dsr-tags-module.h"
+#include "cost-tag.h"
 
 namespace ns3 {
 
@@ -258,16 +254,17 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif)
        * \todo pick up one of the routes uniformly at the lowest 
        * distance. Also need to consider the status of the node's queue
       */
-      uint32_t selectIndex;
-      if (m_randomEcmpRouting)
+      Ipv4DSRRoutingTableEntry* route = allRoutes.at (0);
+      for (RouteVec_t::iterator iter = allRoutes.begin (); 
+            iter != allRoutes.end ();
+           iter ++)
         {
-          selectIndex = m_rand->GetInteger (0, allRoutes.size ()-1);
+          if ((*iter)->GetDistance () > route->GetDistance ())
+            {
+              route = *iter;
+            }
         }
-      else 
-        {
-          selectIndex = 0;
-        }
-      Ipv4DSRRoutingTableEntry* route = allRoutes.at (selectIndex);
+      
       // std::cout << "the distance =" << route->GetDistance(); 
       // create a Ipv4Route object from the selected routing table entry
       rtentry = Create<Ipv4Route> ();

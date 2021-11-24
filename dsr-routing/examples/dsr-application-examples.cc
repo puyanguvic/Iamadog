@@ -5,8 +5,7 @@
 #include "ns3/applications-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/point-to-point-module.h"
-#include "ns3/flow-monitor-module.h"
-#include "ns3/dsr-application-module.h"
+#include "ns3/dsr-routing-module.h"
 
 using namespace ns3;
 

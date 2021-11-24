@@ -13,8 +13,10 @@
 #include "ns3/packet.h"
 #include "ns3/trace-source-accessor.h"
 #include "ns3/udp-socket-factory.h"
-#include "ns3/dsr-tags-module.h"
 #include "dsr-sink.h"
+#include "timestamp-tag.h"
+#include "flag-tag.h"
+#include "budget-tag.h"
 #include "ns3/boolean.h"
 
 namespace ns3 {
