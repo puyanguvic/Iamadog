@@ -196,7 +196,6 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif)
                 }
             }
           allRoutes.push_back (*i);
-          // std::cout << "Found dsr host route = " << allRoutes.size () << std::endl;
           NS_LOG_LOGIC (allRoutes.size () << "Found dsr host route" << *i); 
         }
     }
@@ -264,7 +263,6 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif)
           }
       }
       
-      // std::cout << "the distance =" << route->GetDistance(); 
       // create a Ipv4Route object from the selected routing table entry
       rtentry = Create<Ipv4Route> ();
       rtentry->SetDestination (route->GetDest ());
@@ -484,8 +482,6 @@ Ipv4DSRRouting::PrintRoutingTable (Ptr<OutputStreamWrapper> stream, Time::Unit u
           */
           metric << route.GetDistance ();
           *os << std::setiosflags (std::ios::left) <<std::setw(16) << metric.str();
-          // std::cout << "the metric = " << route.GetDistance();
-
           
           // Ref ct not implemented
           *os << "-" << "      ";
@@ -524,8 +520,7 @@ Ipv4DSRRouting::RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDev
 // See if this is a unicast packet we have a route for.
 //
   NS_LOG_LOGIC ("Unicast destination- looking up");
-  header.GetDestination ().Print (std::cout);
-  std::cout << std::endl;
+
   Ptr<Ipv4Route> rtentry = LookupDSRRoute (header.GetDestination (), oif);
   if (rtentry)
     {
