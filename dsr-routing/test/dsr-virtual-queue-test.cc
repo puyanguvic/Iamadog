@@ -63,6 +63,20 @@ std::string dir = "results/";
 
 NS_LOG_COMPONENT_DEFINE ("RoutingTable test");
 
+
+
+void
+CheckQueueDisc (Ptr<QueueDisc> queue)
+{
+  // uint32_t qSize = queue->GetCurrentSize ().GetValue ();
+  uint32_t qNSize = queue->GetNQueueDiscClasses ();
+  std::cout << "The current queue size = " << qNSize << std::endl;
+
+  Simulator::Schedule (Seconds (0.01), &CheckQueueDisc, queue);
+
+  return ;
+}
+
 int 
 main (int argc, char *argv[])
 {
@@ -139,6 +153,11 @@ main (int argc, char *argv[])
   TrafficControlHelper tch;
   tch.SetRootQueueDisc ("ns3::PieQueueDisc");
   tch.Install (d0d3);
+  // Ptr<TrafficControlLayer> tc = d0d3.Get (0)->GetNode ()->GetObject<TrafficControlLayer> ();
+  // Ptr<QueueDisc> queue = tc->GetRootQueueDiscOnDevice (d0d3.Get (0));
+  Ptr<NetDeviceQueueInterface> netIf = d0d3.Get(0)->GetObject <NetDeviceQueueInterface> ();
+  // std::cout << netIf->GetTxQueue (0)->GetQueueLimits () << std::endl;
+  // Simulator::ScheduleNow (&CheckQueueDisc, queue);
 
   // ------------------- IP addresses AND Link Metric ----------------------
   uint16_t hMetric = 1;
