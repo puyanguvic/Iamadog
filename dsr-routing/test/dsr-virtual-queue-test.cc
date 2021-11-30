@@ -1,273 +1,215 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- */
-// Experiment1: Test Guarantee properties
-//
-// Network topology
-//
-//
-//                      
-//    n0 --m-- n3 --s-- n6 
-//    |s       |m       |m
-//    n1 --h-- n4 --h-- n7
-//    |m       |s       |h
-//    n2 --h-- n5 --s-- n8
-// 
-//  h - high capacity link (200Mbps) 
-//  m - medium capcity link (150Mbps)
-//  s - low capacity link (100Mbps)
-// 
-// - all links are point-to-point links with indicated one-way BW/delay
-// - CBR/UDP flows from n0 to n3, and from n3 to n1
-// - FTP/TCP flow from n0 to n3, starting at time 1.2 to time 1.35 sec.
-// - UDP packet size of 210 bytes, with per-packet interval 0.00375 sec.
-//   (i.e., DataRate of 448,000 bps)
-// - DropTail queues 
-// - Tracing of queues and packet receptions to file "simple-global-routing.tr"
-
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <cassert>
-#include <sys/stat.h>
 
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/point-to-point-module.h"
 #include "ns3/applications-module.h"
-#include "ns3/flow-monitor-helper.h"
-#include "ns3/ipv4-dsr-routing-helper.h"
-#include "ns3/netanim-module.h"
+#include "ns3/internet-apps-module.h"
 #include "ns3/traffic-control-module.h"
-#include "ns3/traffic-control-helper.h"
+#include "ns3/flow-monitor-module.h"
 #include "ns3/dsr-routing-module.h"
 
-using namespace ns3;  
+using namespace ns3;
 
-// ============== Auxiliary functions ===============
-std::string dir = "results/";
-
-NS_LOG_COMPONENT_DEFINE ("RoutingTable test");
-
-
+NS_LOG_COMPONENT_DEFINE ("BenchmarkQueueDiscs");
 
 void
-CheckQueueDisc (Ptr<QueueDisc> queue)
+LimitsTrace (Ptr<OutputStreamWrapper> stream, uint32_t oldVal, uint32_t newVal)
 {
-  // uint32_t qSize = queue->GetCurrentSize ().GetValue ();
-  uint32_t qNSize = queue->GetNQueueDiscClasses ();
-  std::cout << "The current queue size = " << qNSize << std::endl;
-
-  Simulator::Schedule (Seconds (0.01), &CheckQueueDisc, queue);
-
-  return ;
+  *stream->GetStream () << Simulator::Now ().GetSeconds () << " " << newVal << std::endl;
 }
 
-int 
-main (int argc, char *argv[])
+void
+BytesInQueueTrace (Ptr<OutputStreamWrapper> stream, uint32_t oldVal, uint32_t newVal)
 {
-  // Allow the user to override any of the defaults and the above
-  // DefaultValue::Bind ()s at run-time, via command-line arguments
+  *stream->GetStream () << Simulator::Now ().GetSeconds () << " " << newVal << std::endl;
+}
+
+static void
+GoodputSampling (std::string fileName, ApplicationContainer app, Ptr<OutputStreamWrapper> stream, float period)
+{
+  Simulator::Schedule (Seconds (period), &GoodputSampling, fileName, app, stream, period);
+  double goodput;
+  uint64_t totalPackets = DynamicCast<PacketSink> (app.Get (0))->GetTotalRx ();
+  goodput = totalPackets * 8 / (Simulator::Now ().GetSeconds () * 1024); // Kbit/s
+  *stream->GetStream () << Simulator::Now ().GetSeconds () << " " << goodput << std::endl;
+}
+
+static void PingRtt (std::string context, Time rtt)
+{
+  std::cout << context << "=" << rtt.GetMilliSeconds () << " ms" << std::endl;
+}
+
+int main (int argc, char *argv[])
+{
+  std::string bandwidth = "10Mbps";
+  std::string delay = "5ms";
+  std::string queueDiscType = "DsrVirtualQueueDisc";
+  uint32_t queueDiscSize = 1000;
+  uint32_t netdevicesQueueSize = 50;
+  bool bql = false;
+
+  std::string flowsDatarate = "20Mbps";
+  uint32_t flowsPacketsSize = 1000;
+
+  float startTime = 0.1f; // in s
+  float simDuration = 60;
+  float samplingPeriod = 1;
+
   CommandLine cmd (__FILE__);
-  bool enableFlowMonitor = false;
-  cmd.AddValue ("EnableMonitor", "Enable Flow Monitor", enableFlowMonitor);
+  cmd.AddValue ("bandwidth", "Bottleneck bandwidth", bandwidth);
+  cmd.AddValue ("delay", "Bottleneck delay", delay);
+  cmd.AddValue ("queueDiscType", "Bottleneck queue disc type in {PfifoFast, ARED, CoDel, FqCoDel, PIE, prio}", queueDiscType);
+  cmd.AddValue ("queueDiscSize", "Bottleneck queue disc size in packets", queueDiscSize);
+  cmd.AddValue ("netdevicesQueueSize", "Bottleneck netdevices queue size in packets", netdevicesQueueSize);
+  cmd.AddValue ("bql", "Enable byte queue limits on bottleneck netdevices", bql);
+  cmd.AddValue ("flowsDatarate", "Upload and download flows datarate", flowsDatarate);
+  cmd.AddValue ("flowsPacketsSize", "Upload and download flows packets sizes", flowsPacketsSize);
+  cmd.AddValue ("startTime", "Simulation start time", startTime);
+  cmd.AddValue ("simDuration", "Simulation duration in seconds", simDuration);
+  cmd.AddValue ("samplingPeriod", "Goodput sampling period in seconds", samplingPeriod);
   cmd.Parse (argc, argv);
 
-  // ------------------ build topology ---------------------------
-  NS_LOG_INFO ("Create nodes.");
-  NodeContainer nodes;
-  nodes.Create(9);
-  NodeContainer n0n1 = NodeContainer(nodes.Get(0), nodes.Get(1));
-  NodeContainer n1n2 = NodeContainer(nodes.Get(1), nodes.Get(2));
-  NodeContainer n0n3 = NodeContainer(nodes.Get(0), nodes.Get(3));
-  NodeContainer n3n4 = NodeContainer(nodes.Get(3), nodes.Get(4));
-  NodeContainer n1n4 = NodeContainer(nodes.Get(1), nodes.Get(4));
-  NodeContainer n4n5 = NodeContainer(nodes.Get(4), nodes.Get(5));
-  NodeContainer n2n5 = NodeContainer(nodes.Get(2), nodes.Get(5));
-  NodeContainer n3n6 = NodeContainer(nodes.Get(3), nodes.Get(6));
-  NodeContainer n6n7 = NodeContainer(nodes.Get(6), nodes.Get(7));
-  NodeContainer n4n7 = NodeContainer(nodes.Get(4), nodes.Get(7));
-  NodeContainer n7n8 = NodeContainer(nodes.Get(7), nodes.Get(8));
-  NodeContainer n5n8 = NodeContainer(nodes.Get(5), nodes.Get(8));
+  float stopTime = startTime + simDuration;
 
-  // ------------------- install internet protocol to nodes-----------
-  NS_LOG_INFO ("Enabling DSR Routing.");
-  Ipv4DSRRoutingHelper dsr;
+  // Create nodes
+  NodeContainer n1, n2, n3;
+  n1.Create (1);
+  n2.Create (1);
+  n3.Create (1);
 
-  // Ipv4StaticRoutingHelper staticRouting;
+  // Create and configure access link and bottleneck link
+  PointToPointHelper accessLink;
+  accessLink.SetDeviceAttribute ("DataRate", StringValue ("100Mbps"));
+  accessLink.SetChannelAttribute ("Delay", StringValue ("0.1ms"));
+  accessLink.SetQueue ("ns3::DropTailQueue", "MaxSize", StringValue ("100p"));
 
-  Ipv4ListRoutingHelper list;
-  // list.Add (staticRouting, 0);
-  list.Add (dsr, 10);
+  PointToPointHelper bottleneckLink;
+  bottleneckLink.SetDeviceAttribute ("DataRate", StringValue (bandwidth));
+  bottleneckLink.SetChannelAttribute ("Delay", StringValue (delay));
+  bottleneckLink.SetQueue ("ns3::DropTailQueue", "MaxSize", StringValue (std::to_string (netdevicesQueueSize) + "p"));
 
-  InternetStackHelper internet;
-  internet.SetRoutingHelper (list); // has effect on the next Install ()
-  internet.Install (nodes);
+  InternetStackHelper stack;
+  stack.InstallAll ();
 
-  // ----------------create the channels -----------------------------
-  NS_LOG_INFO ("Create channels.");
-  PointToPointHelper p2p;  
-  // High capacity link
-  std::string channelDataRate = "10Mbps"; // link data rate
-  uint32_t delayInMicro = 5000; // transmission + propagation delay
-  double StopTime = 5.0; // Simulation stop time
+  // Access link traffic control configuration
+  TrafficControlHelper tchPfifoFastAccess;
+  tchPfifoFastAccess.SetRootQueueDisc ("ns3::DsrVirtualQueueDisc", "MaxSize", StringValue ("1000p"));
 
-  p2p.SetDeviceAttribute ("DataRate", DataRateValue (DataRate (channelDataRate)));
-  p2p.SetChannelAttribute ("Delay", TimeValue (MicroSeconds(delayInMicro)));
-  NetDeviceContainer d2d5 = p2p.Install (n2n5);
-  NetDeviceContainer d1d4 = p2p.Install (n1n4);
-  NetDeviceContainer d4d7 = p2p.Install (n4n7);
-  NetDeviceContainer d7d8 = p2p.Install (n7n8);
+  // Bottleneck link traffic control configuration
+  TrafficControlHelper tchBottleneck;
 
-  // Medium capacity link
-  p2p.SetDeviceAttribute ("DataRate", DataRateValue (DataRate (channelDataRate)));
-  p2p.SetChannelAttribute ("Delay", TimeValue (MicroSeconds(delayInMicro)));
-  NetDeviceContainer d0d3 = p2p.Install (n0n3);
-  NetDeviceContainer d1d2 = p2p.Install (n1n2);
-  NetDeviceContainer d6d7 = p2p.Install (n6n7);
-  NetDeviceContainer d3d4 = p2p.Install (n3n4);
+  if (queueDiscType.compare ("DsrVirtualQueueDisc") == 0)
+    {
+      tchBottleneck.SetRootQueueDisc ("ns3::DsrVirtualQueueDisc", "MaxSize",
+                                      QueueSizeValue (QueueSize (QueueSizeUnit::PACKETS, queueDiscSize)));
+    }
 
-  // Low capacity link
-  p2p.SetDeviceAttribute ("DataRate", DataRateValue (DataRate (channelDataRate)));
-  p2p.SetChannelAttribute ("Delay", TimeValue (MicroSeconds(delayInMicro)));
-  NetDeviceContainer d0d1 = p2p.Install (n0n1);
-  NetDeviceContainer d4d5 = p2p.Install (n4n5);
-  NetDeviceContainer d3d6 = p2p.Install (n3n6);
-  NetDeviceContainer d5d8 = p2p.Install (n5n8);
+  NetDeviceContainer devicesAccessLink = accessLink.Install (n1.Get (0), n2.Get (0));
+  tchPfifoFastAccess.Install (devicesAccessLink);
+  Ipv4AddressHelper address;
+  address.SetBase ("192.168.0.0", "255.255.255.0");
+  address.NewNetwork ();
+  Ipv4InterfaceContainer interfacesAccess = address.Assign (devicesAccessLink);
 
-  // ------------------------ Install dsr-virtual queue --------------
-  TrafficControlHelper tch;
-  tch.SetRootQueueDisc ("ns3::PieQueueDisc");
-  tch.Install (d0d3);
-  // Ptr<TrafficControlLayer> tc = d0d3.Get (0)->GetNode ()->GetObject<TrafficControlLayer> ();
-  // Ptr<QueueDisc> queue = tc->GetRootQueueDiscOnDevice (d0d3.Get (0));
-  Ptr<NetDeviceQueueInterface> netIf = d0d3.Get(0)->GetObject <NetDeviceQueueInterface> ();
-  // std::cout << netIf->GetTxQueue (0)->GetQueueLimits () << std::endl;
-  // Simulator::ScheduleNow (&CheckQueueDisc, queue);
+  NetDeviceContainer devicesBottleneckLink = bottleneckLink.Install (n2.Get (0), n3.Get (0));
+  QueueDiscContainer qdiscs;
+  qdiscs = tchBottleneck.Install (devicesBottleneckLink);
 
-  // ------------------- IP addresses AND Link Metric ----------------------
-  uint16_t hMetric = 1;
-  uint16_t mMetric = 1;
-  uint16_t lMetric = 1;
-  
-  NS_LOG_INFO ("Assign IP Addresses.");
-  Ipv4AddressHelper ipv4;
-  ipv4.SetBase ("10.1.1.0", "255.255.255.0");
-  Ipv4InterfaceContainer i0i1 = ipv4.Assign (d0d1);
-  i0i1.SetMetric (0, lMetric);
-  i0i1.SetMetric (1, lMetric);
+  address.NewNetwork ();
+  Ipv4InterfaceContainer interfacesBottleneck = address.Assign (devicesBottleneckLink);
 
-  ipv4.SetBase ("10.1.11.0", "255.255.255.0");
-  Ipv4InterfaceContainer i0i3 = ipv4.Assign (d0d3);
-  i0i3.SetMetric (0, mMetric);
-  i0i3.SetMetric (1, mMetric);
+  Ptr<NetDeviceQueueInterface> interface = devicesBottleneckLink.Get (0)->GetObject<NetDeviceQueueInterface> ();
+  Ptr<NetDeviceQueue> queueInterface = interface->GetTxQueue (0);
+  Ptr<DynamicQueueLimits> queueLimits = StaticCast<DynamicQueueLimits> (queueInterface->GetQueueLimits ());
 
-  ipv4.SetBase ("10.1.2.0", "255.255.255.0");
-  Ipv4InterfaceContainer i1i2 = ipv4.Assign (d1d2);
-  i1i2.SetMetric (0, mMetric);
-  i1i2.SetMetric (1, mMetric);
+  AsciiTraceHelper ascii;
+  if (bql)
+    {
+      queueDiscType = queueDiscType + "-bql";
+      Ptr<OutputStreamWrapper> streamLimits = ascii.CreateFileStream (queueDiscType + "-limits.txt");
+      queueLimits->TraceConnectWithoutContext ("Limit",MakeBoundCallback (&LimitsTrace, streamLimits));
+    }
+  Ptr<Queue<Packet> > queue = StaticCast<PointToPointNetDevice> (devicesBottleneckLink.Get (0))->GetQueue ();
+  Ptr<OutputStreamWrapper> streamBytesInQueue = ascii.CreateFileStream (queueDiscType + "-bytesInQueue.txt");
+  queue->TraceConnectWithoutContext ("BytesInQueue",MakeBoundCallback (&BytesInQueueTrace, streamBytesInQueue));
 
-  ipv4.SetBase ("10.1.12.0", "255.255.255.0");
-  Ipv4InterfaceContainer i1i4 = ipv4.Assign (d1d4);
-  i1i4.SetMetric (0, hMetric);
-  i1i4.SetMetric (1, hMetric);
+  Ipv4InterfaceContainer n1Interface;
+  n1Interface.Add (interfacesAccess.Get (0));
 
-  ipv4.SetBase ("10.1.13.0", "255.255.255.0");
-  Ipv4InterfaceContainer i2i5 = ipv4.Assign (d2d5);
-  i2i5.SetMetric (0, hMetric);
-  i2i5.SetMetric (1, hMetric);
+  Ipv4InterfaceContainer n3Interface;
+  n3Interface.Add (interfacesBottleneck.Get (1));
 
-  ipv4.SetBase ("10.1.4.0", "255.255.255.0");
-  Ipv4InterfaceContainer i3i4 = ipv4.Assign (d3d4);
-  i3i4.SetMetric (0, mMetric);
-  i3i4.SetMetric (1, mMetric);
+  Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
-  ipv4.SetBase ("10.1.14.0", "255.255.255.0");
-  Ipv4InterfaceContainer i3i6 = ipv4.Assign (d3d6);
-  i3i6.SetMetric (0, lMetric);
-  i3i6.SetMetric (1, lMetric);
+  Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (flowsPacketsSize));
 
-  ipv4.SetBase ("10.1.5.0", "255.255.255.0");
-  Ipv4InterfaceContainer i4i5 = ipv4.Assign (d4d5);
-  i4i5.SetMetric (0, lMetric);
-  i4i5.SetMetric (1, lMetric);
+  // Flows configuration
+  // Bidirectional TCP streams with ping like flent tcp_bidirectional test.
+  uint16_t port = 7;
+  ApplicationContainer uploadApp, downloadApp, sourceApps;
+  // Configure and install upload flow
+  Address addUp (InetSocketAddress (Ipv4Address::GetAny (), port));
+  PacketSinkHelper sinkHelperUp ("ns3::TcpSocketFactory", addUp);
+  sinkHelperUp.SetAttribute ("Protocol", TypeIdValue (TcpSocketFactory::GetTypeId ()));
+  uploadApp.Add (sinkHelperUp.Install (n3));
 
-  ipv4.SetBase ("10.1.15.0", "255.255.255.0");
-  Ipv4InterfaceContainer i4i7 = ipv4.Assign (d4d7);
-  i4i7.SetMetric (0, hMetric);
-  i4i7.SetMetric (1, hMetric);
+  InetSocketAddress socketAddressUp = InetSocketAddress (n3Interface.GetAddress (0), port);
+  OnOffHelper onOffHelperUp ("ns3::TcpSocketFactory", Address ());
+  onOffHelperUp.SetAttribute ("Remote", AddressValue (socketAddressUp));
+  onOffHelperUp.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
+  onOffHelperUp.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
+  onOffHelperUp.SetAttribute ("PacketSize", UintegerValue (flowsPacketsSize));
+  onOffHelperUp.SetAttribute ("DataRate", StringValue (flowsDatarate));
+  sourceApps.Add (onOffHelperUp.Install (n1));
 
-  ipv4.SetBase ("10.1.16.0", "255.255.255.0");
-  Ipv4InterfaceContainer i5i8 = ipv4.Assign (d5d8); 
-  i5i8.SetMetric (0, lMetric);
-  i5i8.SetMetric (1, lMetric);
+  port = 8;
+  // Configure and install download flow
+  Address addDown (InetSocketAddress (Ipv4Address::GetAny (), port));
+  PacketSinkHelper sinkHelperDown ("ns3::TcpSocketFactory", addDown);
+  sinkHelperDown.SetAttribute ("Protocol", TypeIdValue (TcpSocketFactory::GetTypeId ()));
+  downloadApp.Add (sinkHelperDown.Install (n1));
 
-  ipv4.SetBase ("10.1.6.0", "255.255.255.0");
-  Ipv4InterfaceContainer i6i7 = ipv4.Assign (d6d7);
-  i6i7.SetMetric (0, mMetric);
-  i6i7.SetMetric (1, mMetric);
+  InetSocketAddress socketAddressDown = InetSocketAddress (n1Interface.GetAddress (0), port);
+  OnOffHelper onOffHelperDown ("ns3::TcpSocketFactory", Address ());
+  onOffHelperDown.SetAttribute ("Remote", AddressValue (socketAddressDown));
+  onOffHelperDown.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
+  onOffHelperDown.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
+  onOffHelperDown.SetAttribute ("PacketSize", UintegerValue (flowsPacketsSize));
+  onOffHelperDown.SetAttribute ("DataRate", StringValue (flowsDatarate));
+  sourceApps.Add (onOffHelperDown.Install (n3));
 
-  ipv4.SetBase ("10.1.7.0", "255.255.255.0");
-  Ipv4InterfaceContainer i7i8 = ipv4.Assign (d7d8);
-  i7i8.SetMetric (0, hMetric);
-  i7i8.SetMetric (1, hMetric);
+  // Configure and install ping
+  V4PingHelper ping = V4PingHelper (n3Interface.GetAddress (0));
+  ping.Install (n1);
 
-  // ---------------- Create routingTable ---------------------
-  Ipv4DSRRoutingHelper::PopulateRoutingTables ();
+  Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::V4Ping/Rtt", MakeCallback (&PingRtt));
 
-  // --------------------- DSR Application -----------------
-  //Create a dsrSink applications
-  uint16_t sinkPort = 8080;
-  Address sinkAddress (InetSocketAddress (i7i8.GetAddress (1), sinkPort));
-  DsrSinkHelper dsrSinkHelper ("ns3::UdpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), sinkPort));
-  ApplicationContainer sinkApps = dsrSinkHelper.Install (nodes.Get (8));
-  sinkApps.Start (Seconds (0.));
-  sinkApps.Stop (Seconds (20.));
+  uploadApp.Start (Seconds (0));
+  uploadApp.Stop (Seconds (stopTime));
+  downloadApp.Start (Seconds (0));
+  downloadApp.Stop (Seconds (stopTime));
 
-  // create a sender application
-  Ptr<Socket> ns3UdpSocket = Socket::CreateSocket (nodes.Get (0), UdpSocketFactory::GetTypeId ());
-  uint32_t budget = 30;
-  Ptr<DsrApplication> app = CreateObject<DsrApplication> ();
-  app->Setup (ns3UdpSocket, sinkAddress, 200, 1, DataRate ("1Mbps"), budget, false);
-  nodes.Get (0)->AddApplication (app);
-  app->SetStartTime (Seconds (1.));
-  app->SetStopTime (Seconds (20.));
+  sourceApps.Start (Seconds (0 + 0.1));
+  sourceApps.Stop (Seconds (stopTime - 0.1));
 
-  // -------------- Output Routing table & trace files ----------------
-  Ipv4DSRRoutingHelper g;
-  Ptr<OutputStreamWrapper> routingStream = Create<OutputStreamWrapper>
-  ("dsr-test.routes", std::ios::out);
-  g.PrintRoutingTableAllAt (Seconds (0), routingStream);
+  Ptr<OutputStreamWrapper> uploadGoodputStream = ascii.CreateFileStream (queueDiscType + "-upGoodput.txt");
+  Simulator::Schedule (Seconds (samplingPeriod), &GoodputSampling, queueDiscType + "-upGoodput.txt", uploadApp,
+                       uploadGoodputStream, samplingPeriod);
+  Ptr<OutputStreamWrapper> downloadGoodputStream = ascii.CreateFileStream (queueDiscType + "-downGoodput.txt");
+  Simulator::Schedule (Seconds (samplingPeriod), &GoodputSampling, queueDiscType + "-downGoodput.txt", downloadApp,
+                       downloadGoodputStream, samplingPeriod);
 
-  //----------------- NetAnim ---------------------------------------
-  AnimationInterface anim("dsr-virtual-queue-test.xml");
-  anim.SetConstantPosition (nodes.Get(0), 0.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(1), 0.0, 110.0);
-  anim.SetConstantPosition (nodes.Get(2), 0.0, 120.0);
-  anim.SetConstantPosition (nodes.Get(3), 10.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(4), 10.0, 110.0);
-  anim.SetConstantPosition (nodes.Get(5), 10.0, 120.0);
-  anim.SetConstantPosition (nodes.Get(6), 20.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(7), 20.0, 110.0);
-  anim.SetConstantPosition (nodes.Get(8), 20.0, 120.0);
+  // Flow monitor
+  Ptr<FlowMonitor> flowMonitor;
+  FlowMonitorHelper flowHelper;
+  flowMonitor = flowHelper.InstallAll();
 
-  NS_LOG_INFO ("Run Simulation.");
-  Simulator::Stop (Seconds (StopTime));
+  Simulator::Stop (Seconds (stopTime));
   Simulator::Run ();
+
+  flowMonitor->SerializeToXmlFile(queueDiscType + "-flowMonitor.xml", true, true);
 
   Simulator::Destroy ();
   return 0;

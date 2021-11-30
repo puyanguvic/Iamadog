@@ -5,6 +5,7 @@
 #include "ns3/queue.h"
 #include "ns3/socket.h"
 #include "dsr-virtual-queue-disc.h"
+#include "priority-tag.h"
 
 namespace ns3 {
 
@@ -16,7 +17,7 @@ TypeId DsrVirtualQueueDisc::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::DsrVirtualQueueDisc")
     .SetParent<QueueDisc> ()
-    .SetGroupName ("TrafficControl")
+    .SetGroupName ("DsrRouting")
     .AddConstructor<DsrVirtualQueueDisc> ()
     .AddAttribute ("MaxSize",
                    "The maximum number of packets accepted by this queue disc.",
@@ -39,41 +40,41 @@ DsrVirtualQueueDisc::~DsrVirtualQueueDisc ()
   NS_LOG_FUNCTION (this);
 }
 
-const uint32_t DsrVirtualQueueDisc::prio2band[16] = {1, 2, 2, 2, 1, 2, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1};
 
 bool
 DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
 
-  if (GetCurrentSize () >= GetMaxSize ())
+  PriorityTag priorityTag;
+  uint32_t priority;
+  if(item->GetPacket ()->PeekPacketTag (priorityTag))
     {
-      NS_LOG_LOGIC ("Queue disc limit exceeded -- dropping packet");
+      priority = priorityTag.GetPriority ();
+      if(GetInternalQueue(priority)->GetCurrentSize ().GetValue() >= LinesSize[priority])
+        {
+          NS_LOG_LOGIC ("The Internal Queue limit exceeded -- dropping packet");
+          DropBeforeEnqueue (item, LIMIT_EXCEEDED_DROP);
+          return false;
+        }
+      
+      bool retval = GetInternalQueue (priority)->Enqueue (item);
+      if (!retval)
+        {
+          NS_LOG_WARN ("Packet enqueue failed. Check the size of the internal queues");
+        }
+
+      NS_LOG_LOGIC ("Number packets band" << priority << ": " <<GetInternalQueue (priority)->GetNPackets ());
+      return retval;
+    }
+  
+  if (GetInternalQueue (2)->GetCurrentSize ().GetValue () >= LinesSize[2])
+    {
+      NS_LOG_LOGIC ("The Normal line Queue limit exceeded -- dropping packet");
       DropBeforeEnqueue (item, LIMIT_EXCEEDED_DROP);
       return false;
     }
-
-  uint8_t priority = 0;
-  SocketPriorityTag priorityTag;
-  if (item->GetPacket ()->PeekPacketTag (priorityTag))
-    {
-      priority = priorityTag.GetPriority ();
-    }
-
-  uint32_t band = prio2band[priority & 0x0f];
-
-  bool retval = GetInternalQueue (band)->Enqueue (item);
-
-  // If Queue::Enqueue fails, QueueDisc::DropBeforeEnqueue is called by the
-  // internal queue because QueueDisc::AddInternalQueue sets the trace callback
-
-  if (!retval)
-    {
-      NS_LOG_WARN ("Packet enqueue failed. Check the size of the internal queues");
-    }
-
-  NS_LOG_LOGIC ("Number packets band " << band << ": " << GetInternalQueue (band)->GetNPackets ());
-
+  bool retval = GetInternalQueue (2)->Enqueue (item);
   return retval;
 }
 
@@ -122,19 +123,20 @@ DsrVirtualQueueDisc::DoPeek (void)
 bool
 DsrVirtualQueueDisc::CheckConfig (void)
 {
+  std::cout << "queue line Number = " << GetNInternalQueues () << std::endl;
   NS_LOG_FUNCTION (this);
   if (GetNQueueDiscClasses () > 0)
     {
-      NS_LOG_ERROR ("PfifoFastQueueDisc cannot have classes");
+      NS_LOG_ERROR ("DsrVirtualQueueDisc cannot have classes");
       return false;
     }
 
   if (GetNPacketFilters () != 0)
     {
-      NS_LOG_ERROR ("PfifoFastQueueDisc needs no packet filter");
+      NS_LOG_ERROR ("DsrVirtualQueueDisc needs no packet filter");
       return false;
     }
-
+  
   if (GetNInternalQueues () == 0)
     {
       // create 3 DropTail queues with GetLimit() packets each
@@ -148,7 +150,7 @@ DsrVirtualQueueDisc::CheckConfig (void)
 
   if (GetNInternalQueues () != 3)
     {
-      NS_LOG_ERROR ("PfifoFastQueueDisc needs 3 internal queues");
+      NS_LOG_ERROR ("DsrVirtualQueueDisc needs 3 internal queues");
       return false;
     }
 
@@ -168,7 +170,7 @@ DsrVirtualQueueDisc::CheckConfig (void)
           return false;
         }
     }
-
+  std::cout << "The number of Internal Queues = "<< GetNInternalQueues () << std::endl;
   return true;
 }
 
