@@ -23,6 +23,8 @@
 #include "ns3/simulator.h"
 #include "ns3/object.h"
 #include "ns3/packet.h"
+#include "ns3/network-module.h"
+#include "ns3/traffic-control-module.h"
 #include "ns3/net-device.h"
 #include "ns3/ipv4-route.h"
 #include "ns3/ipv4-routing-table-entry.h"
@@ -257,6 +259,11 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif)
       Ipv4DSRRoutingTableEntry* route = allRoutes.at (0);
       for (uint32_t i = 0; i < allRoutes.size (); i ++)
       {
+
+        if (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetCurrentSize ().GetValue () > 0)
+          {
+            continue ;
+          } 
         if (allRoutes.at (i)->GetDistance () < route->GetDistance ())
           {
             route = allRoutes.at (i);

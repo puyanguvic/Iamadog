@@ -74,6 +74,7 @@ DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       DropBeforeEnqueue (item, LIMIT_EXCEEDED_DROP);
       return false;
     }
+  // std::cout << "The current Internal queue size =" << GetInternalQueue (2) ->GetCurrentSize ().GetValue () << std::endl;
   bool retval = GetInternalQueue (2)->Enqueue (item);
   return retval;
 }
@@ -123,7 +124,7 @@ DsrVirtualQueueDisc::DoPeek (void)
 bool
 DsrVirtualQueueDisc::CheckConfig (void)
 {
-  std::cout << "queue line Number = " << GetNInternalQueues () << std::endl;
+  // std::cout << "queue line Number = " << GetNInternalQueues () << std::endl;
   NS_LOG_FUNCTION (this);
   if (GetNQueueDiscClasses () > 0)
     {
@@ -170,7 +171,7 @@ DsrVirtualQueueDisc::CheckConfig (void)
           return false;
         }
     }
-  std::cout << "The number of Internal Queues = "<< GetNInternalQueues () << std::endl;
+  // std::cout << "The number of Internal Queues = "<< GetNInternalQueues () << std::endl;
   return true;
 }
 
