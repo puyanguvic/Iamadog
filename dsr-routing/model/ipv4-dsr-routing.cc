@@ -259,7 +259,6 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif)
       Ipv4DSRRoutingTableEntry* route = allRoutes.at (0);
       for (uint32_t i = 0; i < allRoutes.size (); i ++)
       {
-
         if (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetCurrentSize ().GetValue () > 0)
           {
             continue ;

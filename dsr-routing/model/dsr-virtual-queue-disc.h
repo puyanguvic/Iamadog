@@ -26,6 +26,8 @@ public:
   static constexpr const char* LIMIT_EXCEEDED_DROP = "Queue disc limit exceeded";  //!< Packet dropped due to queue disc limit exceeded
 
 private:
+  // packet size = 1kB
+  // packet size for test = 52B
   uint32_t LinesSize[3] = {12,36,100};
   virtual bool DoEnqueue (Ptr<QueueDiscItem> item);
   virtual Ptr<QueueDiscItem> DoDequeue (void);
