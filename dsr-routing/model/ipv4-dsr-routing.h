@@ -293,6 +293,7 @@ private:
    * \return Ipv4Route to route the packet to reach dest address
    */
   Ptr<Ipv4Route> LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif = 0);
+  Ptr<Ipv4Route> LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> oif = 0);
 
   HostRoutes m_hostRoutes;             //!< Routes to hosts
   NetworkRoutes m_networkRoutes;       //!< Routes to networks

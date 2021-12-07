@@ -22,7 +22,7 @@ class PriorityTag : public Tag
    void SetPriority (uint32_t priority);
    uint32_t GetPriority (void) const;
  private:
-   uint32_t m_priority; // in millisecond  
+   uint32_t m_priority; // 0-fast, 1-slow, 2-best effort
  };
 
 }

@@ -56,7 +56,7 @@ DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           NS_LOG_LOGIC ("The Internal Queue limit exceeded -- dropping packet");
           DropBeforeEnqueue (item, LIMIT_EXCEEDED_DROP);
           return false;
-        }
+        }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
       
       bool retval = GetInternalQueue (priority)->Enqueue (item);
       if (!retval)

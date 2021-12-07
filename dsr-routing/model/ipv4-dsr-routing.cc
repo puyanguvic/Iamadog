@@ -33,6 +33,9 @@
 #include "ipv4-dsr-routing.h"
 #include "dsr-route-manager.h"
 #include "cost-tag.h"
+#include "budget-tag.h"
+#include "timestamp-tag.h"
+#include "priority-tag.h"
 
 namespace ns3 {
 
@@ -253,21 +256,209 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif)
     {
       /**
        * \author Pu Yang
-       * \todo pick up one of the routes uniformly at the lowest 
-       * distance. Also need to consider the status of the node's queue
+       * \todo get all the possible route to the destination, and weight randomly
+       * select a possbile route  
       */
-      Ipv4DSRRoutingTableEntry* route = allRoutes.at (0);
+     // The best effort route
+      uint32_t selectIndex;
+      selectIndex = m_rand->GetInteger (0, allRoutes.size ()-1);
+      Ipv4DSRRoutingTableEntry* route = allRoutes.at (selectIndex);
+      // create a Ipv4Route object from the selected routing table entry
+      rtentry = Create<Ipv4Route> ();
+      rtentry->SetDestination (route->GetDest ());
+      /// \todo handle multi-address case
+      rtentry->SetSource (m_ipv4->GetAddress (route->GetInterface (), 0).GetLocal ());
+      rtentry->SetGateway (route->GetGateway ());
+      uint32_t interfaceIdx = route->GetInterface ();
+      rtentry->SetOutputDevice (m_ipv4->GetNetDevice (interfaceIdx));
+      /**
+       * \author Pu Yang
+       * \brief set the distance
+      */
+      // uint32_t distance = route->GetDistance();
+      // rtentry->SetDistance (distance);
+      return rtentry;
+    }
+  else 
+    {
+      return 0;
+    }
+}
+
+Ptr<Ipv4Route>
+Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> oif)
+{
+  /**
+   * \author Pu Yang
+   * \todo to rewrite the lookup functions to find the best route from the routing table.
+   * the routing table in DSR routing is a SPF forest instead of a routing tree in global routing
+  */
+
+  NS_LOG_FUNCTION (this << dest << oif);
+  NS_LOG_LOGIC ("Looking for route for destination " << dest);
+  Ptr<Ipv4Route> rtentry = 0;
+  // store all available routes that bring packets to their destination
+  typedef std::vector<Ipv4DSRRoutingTableEntry*> RouteVec_t;
+  RouteVec_t allRoutes;
+
+  NS_LOG_LOGIC ("Number of m_hostRoutes = " << m_hostRoutes.size ());
+  for (HostRoutesCI i = m_hostRoutes.begin (); 
+       i != m_hostRoutes.end (); 
+       i++) 
+    {
+      NS_ASSERT ((*i)->IsHost ());
+      if ((*i)->GetDest () == dest)
+        {
+          if (oif != 0)
+            {
+              if (oif != m_ipv4->GetNetDevice ((*i)->GetInterface ()))
+                {
+                  NS_LOG_LOGIC ("Not on requested interface, skipping");
+                  continue;
+                }
+            }
+          allRoutes.push_back (*i);
+          NS_LOG_LOGIC (allRoutes.size () << "Found dsr host route" << *i); 
+        }
+    }
+  if (allRoutes.size () == 0) // if no host route is found
+    {
+      NS_LOG_LOGIC ("Number of m_networkRoutes" << m_networkRoutes.size ());
+      for (NetworkRoutesI j = m_networkRoutes.begin (); 
+           j != m_networkRoutes.end (); 
+           j++) 
+        {
+          Ipv4Mask mask = (*j)->GetDestNetworkMask ();
+          Ipv4Address entry = (*j)->GetDestNetwork ();
+          if (mask.IsMatch (dest, entry)) 
+            {
+              if (oif != 0)
+                {
+                  if (oif != m_ipv4->GetNetDevice ((*j)->GetInterface ()))
+                    {
+                      NS_LOG_LOGIC ("Not on requested interface, skipping");
+                      continue;
+                    }
+                }
+              allRoutes.push_back (*j);
+              NS_LOG_LOGIC (allRoutes.size () << "Found DSR network route" << *j);
+            }
+        }
+    }
+  if (allRoutes.size () == 0)  // consider external if no host/network found
+    {
+      for (ASExternalRoutesI k = m_ASexternalRoutes.begin ();
+           k != m_ASexternalRoutes.end ();
+           k++)
+        {
+          Ipv4Mask mask = (*k)->GetDestNetworkMask ();
+          Ipv4Address entry = (*k)->GetDestNetwork ();
+          if (mask.IsMatch (dest, entry))
+            {
+              NS_LOG_LOGIC ("Found external route" << *k);
+              if (oif != 0)
+                {
+                  if (oif != m_ipv4->GetNetDevice ((*k)->GetInterface ()))
+                    {
+                      NS_LOG_LOGIC ("Not on requested interface, skipping");
+                      continue;
+                    }
+                }
+              allRoutes.push_back (*k);
+              break;
+            }
+        }
+    }
+  if (allRoutes.size () > 0 ) // if route(s) is found
+    {
+      /**
+       * \author Pu Yang
+       * \todo get all the possible route to the destination, and weight randomly
+       * select a possbile route  
+      */
+      BudgetTag budgetTag;
+      p->PeekPacketTag (budgetTag);
+      TimestampTag timestampTag;
+      p->PeekPacketTag (timestampTag);
+      uint32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
+      for (uint32_t i = 0; i < allRoutes.size (); i ++)
+        {
+          if (allRoutes.at(i)->GetDistance () >= budget)
+            {
+              allRoutes.erase (allRoutes.begin () + i);
+            }
+        }
+      if (allRoutes.size () == 0)
+        {
+          return 0;
+        }
+      uint32_t internalNqueue = m_ipv4->GetNetDevice (0)->GetNode ()->GetObject<TrafficControlLayer> ()-> GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (0)->GetInterface()))->GetNInternalQueues();
+
+      double weight[allRoutes.size ()* (internalNqueue - 1)];  // Exclude best-effort lane
+      double tempSum = 0;
       for (uint32_t i = 0; i < allRoutes.size (); i ++)
       {
-        if (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetCurrentSize ().GetValue () > 0)
+        // weight[i] = 1.0 / (m_ipv4->GetNetDevice (allRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetCurrentSize ().GetValue () + 0.01);
+        uint32_t dn = budget - allRoutes.at (i)->GetDistance();
+        uint32_t ql_fast = m_ipv4->GetNetDevice (allRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetInternalQueue (0)->GetCurrentSize ().GetValue ();
+        uint32_t ql_slow = m_ipv4->GetNetDevice (allRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetInternalQueue (1)->GetCurrentSize ().GetValue ();
+        uint32_t packet_size = 52;
+        uint32_t linkrate;
+        Ptr<NetDevice> device = m_ipv4->GetNetDevice (allRoutes.at (i)->GetInterface ());
+        DataRateValue dataRate;
+        device->GetAttribute ("DataRate", dataRate);
+        linkrate = dataRate.Get().GetBitRate ();
+        double edq_fast = ql_fast*packet_size*8 / (0.5*linkrate);
+        double edq_slow = ql_slow*packet_size*8 / (0.3*linkrate);
+        
+        weight [2*i] = std::max(dn - edq_fast, 0.0);
+        weight [2*i+1] = std::max(dn-edq_slow, 0.0);
+
+        tempSum += (weight[2*i] + weight[2*i+1]);
+
+        // weight[i] = max((dn - E[dq]), 0) 
+        // dn = per-hop budget,  E[dq] = estimated next-hop delay
+        //  per-hop_budget = current_budget - next-hop cost, current_budget = delay_budget - (timestamp.now()-timestamp.begin())
+        //  estimated next-hop delay = Qh/(w*C),  Qh = next-hop queue length, w = fast/slow lane weight, C = link rate
+        // 
+        // total_weight = sum(weight)
+        // weight[i] = weight[i]/total_weight
+      }
+      if (tempSum == 0)
+      {
+        NS_LOG_ERROR ("All next-hops are congested!! Drop packet");       
+        return 0;
+      }
+
+      NS_LOG_LOGIC ("Select route by probability");
+      for (uint32_t i = 0; i < allRoutes.size () * (internalNqueue - 1); i ++)
+      {
+        weight[i] = weight[i]/tempSum * 100;
+      }      
+      for (uint32_t i = 0; i < allRoutes.size () * (internalNqueue - 1) -1; i ++)
+      {
+        weight[i+1] += weight[i];
+      }
+
+      Ipv4DSRRoutingTableEntry* route = allRoutes.at (0);
+      uint32_t randInt = m_rand->GetInteger (0, 100);
+      uint32_t selectRouteIndex = 0;
+      uint32_t selectLaneIndex = 0;
+      for (uint32_t i = 0; i < allRoutes.size () * (internalNqueue - 1); i ++)
+      {
+        if (randInt >= weight[i])
           {
-            continue ;
-          } 
-        if (allRoutes.at (i)->GetDistance () < route->GetDistance ())
-          {
-            route = allRoutes.at (i);
+            selectRouteIndex = i / 2;
+            selectLaneIndex = i % 2;
           }
       }
+      // std::cout << "selectNodeIndex = " << selectRouteIndex << std::endl;
+      // std::cout << "selectLaneIndex = " << selectLaneIndex << std::endl;
+      route = allRoutes.at (selectRouteIndex);
+      PriorityTag priorityTag;
+      p->RemovePacketTag (priorityTag);
+      priorityTag.SetPriority (selectLaneIndex);
+      p->AddPacketTag (priorityTag);
       
       // create a Ipv4Route object from the selected routing table entry
       rtentry = Create<Ipv4Route> ();
@@ -277,6 +468,7 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<NetDevice> oif)
       rtentry->SetGateway (route->GetGateway ());
       uint32_t interfaceIdx = route->GetInterface ();
       rtentry->SetOutputDevice (m_ipv4->GetNetDevice (interfaceIdx));
+
       /**
        * \author Pu Yang
        * \brief set the distance
@@ -526,8 +718,16 @@ Ipv4DSRRouting::RouteOutput (Ptr<Packet> p, const Ipv4Header &header, Ptr<NetDev
 // See if this is a unicast packet we have a route for.
 //
   NS_LOG_LOGIC ("Unicast destination- looking up");
-
-  Ptr<Ipv4Route> rtentry = LookupDSRRoute (header.GetDestination (), oif);
+  Ptr<Ipv4Route> rtentry; 
+  BudgetTag budgetTag;
+  if (p->PeekPacketTag (budgetTag))
+  {
+    rtentry = LookupDSRRoute (header.GetDestination (), p, oif);
+  }
+  else
+  {
+    rtentry = LookupDSRRoute (header.GetDestination (), oif);
+  }
   if (rtentry)
     {
       sockerr = Socket::ERROR_NOTERROR;
@@ -597,7 +797,16 @@ Ipv4DSRRouting::RouteInput  (Ptr<const Packet> p, const Ipv4Header &header, Ptr<
     }
   // Next, try to find a route
   NS_LOG_LOGIC ("Unicast destination- looking up global route");
-  Ptr<Ipv4Route> rtentry = LookupDSRRoute (header.GetDestination ());
+  Ptr<Ipv4Route> rtentry; 
+  BudgetTag budgetTag;
+  if (p->PeekPacketTag (budgetTag))
+  {
+    rtentry = LookupDSRRoute (header.GetDestination (), p_copy);
+  }
+  else
+  {
+    rtentry = LookupDSRRoute (header.GetDestination ());
+  }
   if (rtentry != 0)
     {
       /**
