@@ -24,6 +24,7 @@ public:
 
   // Reasons for dropping packets
   static constexpr const char* LIMIT_EXCEEDED_DROP = "Queue disc limit exceeded";  //!< Packet dropped due to queue disc limit exceeded
+  static constexpr const char* TIMEOUT_DROP = "time out !!!!!!!!";
 
 private:
   // packet size = 1kB

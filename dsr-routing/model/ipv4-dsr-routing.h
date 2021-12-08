@@ -254,6 +254,8 @@ public:
    */
   int64_t AssignStreams (int64_t stream);
 
+  // static bool CompareRouteCost(Ipv4DSRRoutingTableEntry* route1, Ipv4DSRRoutingTableEntry* route2);
+
 protected:
   void DoDispose (void);
 

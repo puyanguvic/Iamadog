@@ -381,6 +381,7 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
       TimestampTag timestampTag;
       p->PeekPacketTag (timestampTag);
       uint32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
+      std::cout << "budget = " << budget << "\n";
       for (uint32_t i = 0; i < allRoutes.size (); i ++)
         {
           if (allRoutes.at(i)->GetDistance () >= budget)
@@ -392,6 +393,9 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
         {
           return 0;
         }
+      // std::sort (allRoutes.begin (), allRoutes.end (), CompareRouteCost);
+
+
       uint32_t internalNqueue = m_ipv4->GetNetDevice (0)->GetNode ()->GetObject<TrafficControlLayer> ()-> GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (0)->GetInterface()))->GetNInternalQueues();
 
       double weight[allRoutes.size ()* (internalNqueue - 1)];  // Exclude best-effort lane
@@ -410,7 +414,7 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
         linkrate = dataRate.Get().GetBitRate ();
         double edq_fast = ql_fast*packet_size*8 / (0.5*linkrate);
         double edq_slow = ql_slow*packet_size*8 / (0.3*linkrate);
-        
+        // std::cout << "edq_fast = " << edq_fast << ", edq_slow = " << edq_slow << std::endl;
         weight [2*i] = std::max(dn - edq_fast, 0.0);
         weight [2*i+1] = std::max(dn-edq_slow, 0.0);
 
@@ -886,6 +890,20 @@ Ipv4DSRRouting::SetIpv4 (Ptr<Ipv4> ipv4)
   NS_ASSERT (m_ipv4 == 0 && ipv4 != 0);
   m_ipv4 = ipv4;
 }
-
+// static bool
+// Ipv4DSRRouting::CompareRouteCost(Ipv4DSRRoutingTableEntry* route1, Ipv4DSRRoutingTableEntry* route2)
+// {
+//   NS_LOG_FUNCTION (&route1 << &route2);
+//   bool result = false;
+//   if (route1->GetDistance () <= route2->GetDistance ())
+//     {
+//       result = true;
+//     }
+//   else
+//     {
+//       result = false;
+//     }
+//   return result;
+// }
 
 } // namespace ns3

@@ -6,6 +6,8 @@
 #include "ns3/socket.h"
 #include "dsr-virtual-queue-disc.h"
 #include "priority-tag.h"
+#include "budget-tag.h"
+#include "timestamp-tag.h"
 
 namespace ns3 {
 
@@ -48,6 +50,17 @@ DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
   PriorityTag priorityTag;
   uint32_t priority;
+  BudgetTag budgetTag;
+  TimestampTag timestampTag;
+  item->GetPacket ()->PeekPacketTag (timestampTag);
+  item->GetPacket ()->PeekPacketTag (budgetTag);
+  int32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
+  std::cout << " the budget = " << budgetTag.GetBudget () << std::endl;
+  if (budget < 0)
+    {
+      NS_LOG_LOGIC ("Timeout dropping");
+      DropBeforeEnqueue (item, TIMEOUT_DROP);
+    }
   if(item->GetPacket ()->PeekPacketTag (priorityTag))
     {
       priority = priorityTag.GetPriority ();
