@@ -55,11 +55,12 @@ DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   item->GetPacket ()->PeekPacketTag (timestampTag);
   item->GetPacket ()->PeekPacketTag (budgetTag);
   int32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
-  std::cout << " the budget = " << budgetTag.GetBudget () << std::endl;
+  // std::cout << " the budget = " << budgetTag.GetBudget () << std::endl;
   if (budget < 0)
     {
       NS_LOG_LOGIC ("Timeout dropping");
       DropBeforeEnqueue (item, TIMEOUT_DROP);
+      return false;
     }
   if(item->GetPacket ()->PeekPacketTag (priorityTag))
     {

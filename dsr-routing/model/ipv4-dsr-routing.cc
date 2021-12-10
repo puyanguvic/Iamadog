@@ -382,33 +382,43 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
       p->PeekPacketTag (timestampTag);
       uint32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
       std::cout << "budget = " << budget << "\n";
+      std::cout << "Old Allroute size = "<< allRoutes.size () << std::endl;
+      RouteVec_t goodRoutes;
+
       for (uint32_t i = 0; i < allRoutes.size (); i ++)
         {
-          if (allRoutes.at(i)->GetDistance () >= budget)
+          // std::cout << "All Distance: " << allRoutes.at(i)->GetDistance () << std::endl;
+          if (allRoutes.at(i)->GetDistance () < budget - 3000)
             {
-              allRoutes.erase (allRoutes.begin () + i);
+              goodRoutes.push_back(allRoutes.at (i));  // BUG: Route not properly erased
             }
         }
-      if (allRoutes.size () == 0)
+      if (goodRoutes.size () == 0)
         {
           return 0;
         }
+      std::cout << "Now goodRoute size = "<< goodRoutes.size () << std::endl;
+      for (uint32_t i = 0; i < goodRoutes.size (); i++)
+        {
+          std::cout << "Current Distance: " << goodRoutes.at(i)->GetDistance () << std::endl;
+        }
+      
       // std::sort (allRoutes.begin (), allRoutes.end (), CompareRouteCost);
 
 
-      uint32_t internalNqueue = m_ipv4->GetNetDevice (0)->GetNode ()->GetObject<TrafficControlLayer> ()-> GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (0)->GetInterface()))->GetNInternalQueues();
+      uint32_t internalNqueue = m_ipv4->GetNetDevice (0)->GetNode ()->GetObject<TrafficControlLayer> ()-> GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(goodRoutes.at (0)->GetInterface()))->GetNInternalQueues();
 
-      double weight[allRoutes.size ()* (internalNqueue - 1)];  // Exclude best-effort lane
+      double weight[goodRoutes.size ()* (internalNqueue - 1)];  // Exclude best-effort lane
       double tempSum = 0;
-      for (uint32_t i = 0; i < allRoutes.size (); i ++)
+      for (uint32_t i = 0; i < goodRoutes.size (); i ++)
       {
         // weight[i] = 1.0 / (m_ipv4->GetNetDevice (allRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetCurrentSize ().GetValue () + 0.01);
-        uint32_t dn = budget - allRoutes.at (i)->GetDistance();
-        uint32_t ql_fast = m_ipv4->GetNetDevice (allRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetInternalQueue (0)->GetCurrentSize ().GetValue ();
-        uint32_t ql_slow = m_ipv4->GetNetDevice (allRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetInternalQueue (1)->GetCurrentSize ().GetValue ();
+        uint32_t dn = budget - goodRoutes.at (i)->GetDistance();
+        uint32_t ql_fast = m_ipv4->GetNetDevice (goodRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(goodRoutes.at (i)->GetInterface()))->GetInternalQueue (0)->GetCurrentSize ().GetValue ();
+        uint32_t ql_slow = m_ipv4->GetNetDevice (goodRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(goodRoutes.at (i)->GetInterface()))->GetInternalQueue (1)->GetCurrentSize ().GetValue ();
         uint32_t packet_size = 52;
         uint32_t linkrate;
-        Ptr<NetDevice> device = m_ipv4->GetNetDevice (allRoutes.at (i)->GetInterface ());
+        Ptr<NetDevice> device = m_ipv4->GetNetDevice (goodRoutes.at (i)->GetInterface ());
         DataRateValue dataRate;
         device->GetAttribute ("DataRate", dataRate);
         linkrate = dataRate.Get().GetBitRate ();
@@ -435,20 +445,20 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
       }
 
       NS_LOG_LOGIC ("Select route by probability");
-      for (uint32_t i = 0; i < allRoutes.size () * (internalNqueue - 1); i ++)
+      for (uint32_t i = 0; i < goodRoutes.size () * (internalNqueue - 1); i ++)
       {
         weight[i] = weight[i]/tempSum * 100;
       }      
-      for (uint32_t i = 0; i < allRoutes.size () * (internalNqueue - 1) -1; i ++)
+      for (uint32_t i = 0; i < goodRoutes.size () * (internalNqueue - 1) -1; i ++)
       {
         weight[i+1] += weight[i];
       }
 
-      Ipv4DSRRoutingTableEntry* route = allRoutes.at (0);
+      Ipv4DSRRoutingTableEntry* route = goodRoutes.at (0); // BUG: only select the first rout
       uint32_t randInt = m_rand->GetInteger (0, 100);
       uint32_t selectRouteIndex = 0;
       uint32_t selectLaneIndex = 0;
-      for (uint32_t i = 0; i < allRoutes.size () * (internalNqueue - 1); i ++)
+      for (uint32_t i = 0; i < goodRoutes.size () * (internalNqueue - 1); i ++)
       {
         if (randInt >= weight[i])
           {
@@ -456,9 +466,9 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
             selectLaneIndex = i % 2;
           }
       }
-      // std::cout << "selectNodeIndex = " << selectRouteIndex << std::endl;
-      // std::cout << "selectLaneIndex = " << selectLaneIndex << std::endl;
-      route = allRoutes.at (selectRouteIndex);
+      std::cout << "selectNodeIndex = " << selectRouteIndex << std::endl;
+      std::cout << "selectLaneIndex = " << selectLaneIndex << std::endl;
+      route = goodRoutes.at (selectRouteIndex);
       PriorityTag priorityTag;
       p->RemovePacketTag (priorityTag);
       priorityTag.SetPriority (selectLaneIndex);
