@@ -318,7 +318,7 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
                 }
             }
           allRoutes.push_back (*i);
-          NS_LOG_LOGIC (allRoutes.size () << "Found dsr host route" << *i); 
+          NS_LOG_LOGIC (allRoutes.size () << "Found dsr host route" << *i << " with Cost: " << (*i)->GetDistance ()); 
         }
     }
   if (allRoutes.size () == 0) // if no host route is found
@@ -385,19 +385,21 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
       // std::cout << "Old Allroute size = "<< allRoutes.size () << std::endl;
       RouteVec_t goodRoutes;
 
+      NS_LOG_INFO (" ALLROUTE SIZE: "<< allRoutes.size());
       for (uint32_t i = 0; i < allRoutes.size (); i ++)
         {
           // std::cout << "All Distance: " << allRoutes.at(i)->GetDistance () << std::endl;
           if (allRoutes.at(i)->GetDistance () < budget)
             {
               goodRoutes.push_back(allRoutes.at (i));  // BUG: Route not properly erased
-              NS_LOG_LOGIC ("GOODROUTE CURRENT NODE GATEWAY" << allRoutes.at (i)->GetGateway());
+              NS_LOG_LOGIC ("GOODROUTE CURRENT NODE GATEWAY " << allRoutes.at (i)->GetGateway());
             }
-          // else
-          //   {
-          //     std::cout << " DROP ROUTE: " << allRoutes.at(i)->GetGateway () << std::endl;
-          //   }
+          else
+            {
+              NS_LOG_INFO (" DROP ROUTE: " << allRoutes.at(i)->GetGateway () << " COST: "<< allRoutes.at(i)->GetDistance () );
+            }
         }
+      NS_LOG_INFO (" GOODROUTE SIZE: "<< goodRoutes.size());
         
       
 
