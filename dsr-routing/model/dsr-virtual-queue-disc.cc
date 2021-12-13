@@ -55,7 +55,7 @@ DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   item->GetPacket ()->PeekPacketTag (timestampTag);
   item->GetPacket ()->PeekPacketTag (budgetTag);
   int32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
-  // std::cout << " the budget = " << budgetTag.GetBudget () << std::endl;
+  // std::cout << " the budget = " << budget << std::endl;
   if (budget < 0)
     {
       NS_LOG_LOGIC ("Timeout dropping");
@@ -100,12 +100,34 @@ DsrVirtualQueueDisc::DoDequeue (void)
 
   Ptr<QueueDiscItem> item;
 
+  // for (uint32_t i = 0; i < GetNInternalQueues (); i++)
+  //   {
+  //     if ((item = GetInternalQueue (i)->Dequeue ()) != 0)
+  //       {
+  //         NS_LOG_LOGIC ("Popped from band " << i << ": " << item);
+  //         NS_LOG_LOGIC ("Number packets band " << i << ": " << GetInternalQueue (i)->GetNPackets ());
+  //         return item;
+  //       }
+  //   }
+
+  uint32_t weight[3]= {5, 3, 2};  
   for (uint32_t i = 0; i < GetNInternalQueues (); i++)
     {
-      if ((item = GetInternalQueue (i)->Dequeue ()) != 0)
+      uint32_t account = weight[i];
+      if (-- account >= 0 && (item = GetInternalQueue (i)->Dequeue ()) != 0)
         {
           NS_LOG_LOGIC ("Popped from band " << i << ": " << item);
           NS_LOG_LOGIC ("Number packets band " << i << ": " << GetInternalQueue (i)->GetNPackets ());
+          QueueSize Q = GetInternalQueue (i)->GetCurrentSize();
+          QueueSize B = GetInternalQueue (i)->GetMaxSize();
+          if (Q == B)
+          {
+            NS_LOG_ERROR ("Buffer bloat at band "<< i << "!!!");
+            DropAfterDequeue (item, BUFFERBLOAT_DROP);
+            std::cout << "Buffer bloat at band " << i << "!!!" << std::endl;
+          }
+          // std::cout << "Buffer size of the lane "<< i << ": " << GetInternalQueue (i)->GetCurrentSize() << std::endl;
+          // std::cout << "Number of packets in lane "<< i << ": " << GetQueueDiscClass (i)->GetQueueDisc ()->GetCurrentSize() << std::endl;         
           return item;
         }
     }
@@ -113,6 +135,46 @@ DsrVirtualQueueDisc::DoDequeue (void)
   NS_LOG_LOGIC ("Queue empty");
   return item;
 }
+
+// Ptr<QueueDiscItem>
+// DsrVirtualQueueDisc::DoDequeue (void)
+// {
+//   NS_LOG_FUNCTION (this);
+
+//   Ptr<QueueDiscItem> item;
+//   /* strict priority queue discipline
+//      dequeue slow lane when the fast lane is empty
+//      dequeue normal lane when the slow lane is empty
+//      shortcoming: may starve the fast lane when there are plenty of packets in the slow/normal lane 
+//      WRR shortcoming: will significant decrease the router effort
+//                       It's not very easy to find a appropriate parameter
+//   */
+//   uint32_t weight[3]= {5, 3, 2};  
+//   for (uint32_t i = 0; i < GetNQueueDiscClasses (); i++)
+//     {
+//       uint32_t account = weight[i];
+//       if (-- account >= 0 && (item = GetQueueDiscClass (i)->GetQueueDisc ()->Dequeue ()) != 0)
+//         {
+//           NS_LOG_LOGIC ("Popped from band " << i << ": " << item);
+//           NS_LOG_LOGIC ("Number packets band " << i << ": " << GetQueueDiscClass (i)->GetQueueDisc ()->GetNPackets ());
+//           QueueSize Q = GetQueueDiscClass (i)->GetQueueDisc ()->GetCurrentSize();
+//           QueueSize B = GetQueueDiscClass (i)->GetQueueDisc ()->GetMaxSize();
+//           if (Q == B)
+//           {
+//             NS_LOG_ERROR ("Buffer bloat at band "<< i << "!!!");
+//             // std::cout << "Buffer bloat at band " << i << "!!!" << std::endl;
+//           }
+
+//           // std::cout << "Buffer size of the lane "<< i << ": " << GetQueueDiscClass (i)->GetQueueDisc ()->GetMaxSize() << std::endl;
+//           // std::cout << "Number of packets in lane "<< i << ": " << GetQueueDiscClass (i)->GetQueueDisc ()->GetCurrentSize() << std::endl;         
+//           return item;
+//         }
+//     }
+  
+//   NS_LOG_LOGIC ("Queue empty");
+//   return item;
+// }
+
 
 Ptr<const QueueDiscItem>
 DsrVirtualQueueDisc::DoPeek (void)

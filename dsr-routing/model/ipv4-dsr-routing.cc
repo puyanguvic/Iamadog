@@ -381,27 +381,39 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
       TimestampTag timestampTag;
       p->PeekPacketTag (timestampTag);
       uint32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
-      std::cout << "budget = " << budget << "\n";
-      std::cout << "Old Allroute size = "<< allRoutes.size () << std::endl;
+      // std::cout << "budget = " << budget << "\n";
+      // std::cout << "Old Allroute size = "<< allRoutes.size () << std::endl;
       RouteVec_t goodRoutes;
 
       for (uint32_t i = 0; i < allRoutes.size (); i ++)
         {
           // std::cout << "All Distance: " << allRoutes.at(i)->GetDistance () << std::endl;
-          if (allRoutes.at(i)->GetDistance () < budget - 3000)
+          if (allRoutes.at(i)->GetDistance () < budget)
             {
               goodRoutes.push_back(allRoutes.at (i));  // BUG: Route not properly erased
+              NS_LOG_LOGIC ("GOODROUTE CURRENT NODE GATEWAY" << allRoutes.at (i)->GetGateway());
             }
+          // else
+          //   {
+          //     std::cout << " DROP ROUTE: " << allRoutes.at(i)->GetGateway () << std::endl;
+          //   }
         }
+        
+      
+
       if (goodRoutes.size () == 0)
         {
+          NS_LOG_ERROR ("NO ROUTE !!! " );
           return 0;
         }
-      std::cout << "Now goodRoute size = "<< goodRoutes.size () << std::endl;
-      for (uint32_t i = 0; i < goodRoutes.size (); i++)
-        {
-          std::cout << "Current Distance: " << goodRoutes.at(i)->GetDistance () << std::endl;
-        }
+      
+
+
+      // std::cout << "Now goodRoute size = "<< goodRoutes.size () << std::endl;
+      // for (uint32_t i = 0; i < goodRoutes.size (); i++)
+      //   {
+      //     std::cout << "Current Distance: " << goodRoutes.at(i)->GetDistance () << std::endl;
+      //   }
       
       // std::sort (allRoutes.begin (), allRoutes.end (), CompareRouteCost);
 
@@ -426,7 +438,7 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
         double edq_slow = ql_slow*packet_size*8 / (0.3*linkrate);
         // std::cout << "edq_fast = " << edq_fast << ", edq_slow = " << edq_slow << std::endl;
         weight [2*i] = std::max(dn - edq_fast, 0.0);
-        weight [2*i+1] = std::max(dn-edq_slow, 0.0);
+        weight [2*i+1] = std::max(dn - edq_slow, 0.0);
 
         tempSum += (weight[2*i] + weight[2*i+1]);
 
@@ -440,7 +452,8 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
       }
       if (tempSum == 0)
       {
-        NS_LOG_ERROR ("All next-hops are congested!! Drop packet");       
+        NS_LOG_ERROR ("All next-hops are congested!! Drop packet");
+        std::cout << "!!!! ipv4 DROP !!!!!"  << std::endl;
         return 0;
       }
 
@@ -449,12 +462,13 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
       {
         weight[i] = weight[i]/tempSum * 100;
       }      
+
       for (uint32_t i = 0; i < goodRoutes.size () * (internalNqueue - 1) -1; i ++)
       {
         weight[i+1] += weight[i];
       }
 
-      Ipv4DSRRoutingTableEntry* route = goodRoutes.at (0); // BUG: only select the first rout
+      Ipv4DSRRoutingTableEntry* route = goodRoutes.at (0);
       uint32_t randInt = m_rand->GetInteger (0, 100);
       uint32_t selectRouteIndex = 0;
       uint32_t selectLaneIndex = 0;
@@ -466,8 +480,8 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
             selectLaneIndex = i % 2;
           }
       }
-      std::cout << "selectNodeIndex = " << selectRouteIndex << std::endl;
-      std::cout << "selectLaneIndex = " << selectLaneIndex << std::endl;
+      // std::cout << "selectNodeIndex = " << selectRouteIndex << std::endl;
+      // std::cout << "selectLaneIndex = " << selectLaneIndex << std::endl;
       route = goodRoutes.at (selectRouteIndex);
       PriorityTag priorityTag;
       p->RemovePacketTag (priorityTag);
@@ -845,6 +859,7 @@ Ipv4DSRRouting::RouteInput  (Ptr<const Packet> p, const Ipv4Header &header, Ptr<
                     // route request.
     }
 }
+
 void 
 Ipv4DSRRouting::NotifyInterfaceUp (uint32_t i)
 {
