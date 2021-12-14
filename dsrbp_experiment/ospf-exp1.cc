@@ -123,7 +123,7 @@ main (int argc, char *argv[])
   // Set up some default values for the simulation.  Use the 
   Config::SetDefault ("ns3::OnOffApplication::PacketSize", UintegerValue (1000));
   Config::SetDefault ("ns3::OnOffApplication::DataRate", StringValue ("5Mb/s"));
-  Config::SetDefault ("ns3::FifoQueueDisc::MaxSize", QueueSizeValue (QueueSize ("35p")));
+  Config::SetDefault ("ns3::FifoQueueDisc::MaxSize", QueueSizeValue (QueueSize ("100p")));
   //DefaultValue::Bind ("DropTailQueue::m_maxPackets", 30);
 
   // Allow the user to override any of the defaults and the above
@@ -161,8 +161,8 @@ main (int argc, char *argv[])
   // PointToPointHelper p2p3; 
   // PointToPointHelper p2p4; 
 
-  std::string channelDataRate1 = "200Mbps"; // link data rate (High)
-  std::string channelDataRate2 = "100Mbps"; // link data rate (low)
+  std::string channelDataRate1 = "10Mbps"; // link data rate (High)
+  std::string channelDataRate2 = "5Mbps"; // link data rate (low)
   uint32_t delayInMicro1 = 3000; // transmission + propagation delay (Short)
   uint32_t delayInMicro2 = 5000; // transmission + propagation delay (Long)
   double BeginTime = 0.0;
@@ -207,6 +207,7 @@ main (int argc, char *argv[])
 //   uint16_t handle1 = 
   tch1.SetRootQueueDisc ("ns3::FifoQueueDisc");
   
+  
   std::vector<QueueDiscContainer> qdisc(12);
   for (int i = 0; i < 12; i ++)
   {
@@ -216,16 +217,53 @@ main (int argc, char *argv[])
 
   // ------------------- IP addresses AND Link Metric ----------------------
   
-  NS_LOG_INFO ("Assign IP Addresses.");
+  // NS_LOG_INFO ("Assign IP Addresses.");
+  // Ipv4AddressHelper ipv4;
+  // std::vector<Ipv4InterfaceContainer> interface(12);
+  // for (int i=0; i < 12; i ++)
+  // {
+  //   std::ostringstream subset;
+  //   subset<<"10.1."<<i+1<<".0";
+  //   ipv4.SetBase (subset.str().c_str(), "255.255.255.0");
+  //   interface[i] = ipv4.Assign (devices[i]);
+  // }
+   NS_LOG_INFO ("Assign IP Addresses.");
   Ipv4AddressHelper ipv4;
-  std::vector<Ipv4InterfaceContainer> interface(12);
-  for (int i=0; i < 12; i ++)
-  {
-    std::ostringstream subset;
-    subset<<"10.1."<<i+1<<".0";
-    ipv4.SetBase (subset.str().c_str(), "255.255.255.0");
-    interface[i] = ipv4.Assign (devices[i]);
-  }
+  ipv4.SetBase ("10.1.1.0", "255.255.255.0");
+  Ipv4InterfaceContainer i0i1 = ipv4.Assign (devices[2]);
+
+  ipv4.SetBase ("10.1.11.0", "255.255.255.0");
+  Ipv4InterfaceContainer i0i3 = ipv4.Assign (devices[0]);
+
+  ipv4.SetBase ("10.1.2.0", "255.255.255.0");
+  Ipv4InterfaceContainer i1i2 = ipv4.Assign (devices[7]);
+
+  ipv4.SetBase ("10.1.12.0", "255.255.255.0");
+  Ipv4InterfaceContainer i1i4 = ipv4.Assign (devices[5]);
+
+  ipv4.SetBase ("10.1.13.0", "255.255.255.0");
+  Ipv4InterfaceContainer i2i5 = ipv4.Assign (devices[10]);
+
+  ipv4.SetBase ("10.1.4.0", "255.255.255.0");
+  Ipv4InterfaceContainer i3i4 = ipv4.Assign (devices[3]);
+
+  ipv4.SetBase ("10.1.14.0", "255.255.255.0");
+  Ipv4InterfaceContainer i3i6 = ipv4.Assign (devices[1]);
+
+  ipv4.SetBase ("10.1.5.0", "255.255.255.0");
+  Ipv4InterfaceContainer i4i5 = ipv4.Assign (devices[8]);
+
+  ipv4.SetBase ("10.1.15.0", "255.255.255.0");
+  Ipv4InterfaceContainer i4i7 = ipv4.Assign (devices[6]);
+
+  ipv4.SetBase ("10.1.16.0", "255.255.255.0");
+  Ipv4InterfaceContainer i5i8 = ipv4.Assign (devices[11]); 
+
+  ipv4.SetBase ("10.1.7.0", "255.255.255.0");
+  Ipv4InterfaceContainer i6i7 = ipv4.Assign (devices[4]);
+
+  ipv4.SetBase ("10.1.8.0", "255.255.255.0");
+  Ipv4InterfaceContainer i7i8 = ipv4.Assign (devices[9]);
 
   // ---------------- Create routingTable ---------------------
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
@@ -289,13 +327,14 @@ main (int argc, char *argv[])
   // ------------------------------------*** Traffic Target Flow (n2 --> n6)-------------------------------------  
    //Create a dsrSink applications 
   uint16_t sinkPort = 8080;
-  Address sinkAddress (InetSocketAddress (interface[4].GetAddress (0), sinkPort));
+  // Address sinkAddress (InetSocketAddress (interface[3].GetAddress (1), sinkPort));
+  Address sinkAddress (InetSocketAddress (i3i6.GetAddress (1), sinkPort));
   InstallPacketSink (nodes.Get (6), sinkPort, "ns3::UdpSocketFactory", BeginTime, StopTime);
 
   // create a dsrSender application
-  uint32_t PacketSize = 1024;
+  uint32_t PacketSize = 52;
   uint32_t NPacket = 1000;
-  InstallBEPacketSend (nodes.Get(2), sinkAddress, BeginTime, StopTime, PacketSize, NPacket, 10, true);
+  InstallBEPacketSend (nodes.Get(2), sinkAddress, BeginTime, StopTime, PacketSize, NPacket, 12, true);
 
 
 // ------------------------ Network DSR TCP application--------------------------------------------
@@ -318,47 +357,41 @@ main (int argc, char *argv[])
 
 
 
-  // // // ---------------------------------------Network UDP Traffic C1 (n0-->n8) ------------------
+  // // ---------------------------------------Network UDP Traffic C1 (n1-->n7) ------------------
 
-  // //Create a dsrSink applications 
-  // Address sinkAddress_1 (InetSocketAddress (interface[11].GetAddress (1), sinkPort));
-  // InstallPacketSink (nodes.Get (7), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
-  // // create a dsrSender application
-  // uint32_t PacketSize1 = 1024;
-  // uint32_t NPacket1 = 1000;
-  // for (int i=1; i<11; i++)
-  // {
-  //   InstallBEPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize1, NPacket1, i*10, true);
-  // }
+  //Create a dsrSink applications 
+  Address sinkAddress_1 (InetSocketAddress (i7i8.GetAddress (0), sinkPort));
+  InstallPacketSink (nodes.Get (7), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
+  // create a dsrSender BE application
+  for (int i=1; i<11; i++)
+  {
+    InstallBEPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize, NPacket, i, false);
+  }
 
 
-
-  // // // // ---------------------------------------Network Traffic C2 (n1-->n6) ------------------
-  // //Create a dsrSink applications 
-  // Address sinkAddress_2 (InetSocketAddress (interface[4].GetAddress (1), sinkPort));
-  // InstallPacketSink (nodes.Get (6), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
-  // // create a dsrSender application
-  // uint32_t PacketSize2 = 1024;
-  // uint32_t NPacket2 = 1000;
-  // for (int i=1; i<11; i++)
-  // {
-  //   InstallBEPacketSend (nodes.Get(1), sinkAddress_2, i-1, i, PacketSize2, NPacket2, i*10, true);
-  // }
-
-  // // ------------------------------------------------------------------
+  // // ---------------------------------------Network Traffic C2 (n0-->n8) ------------------
+  //Create a dsrSink applications 
+  Address sinkAddress_2 (InetSocketAddress (i7i8.GetAddress (1), sinkPort));
+  InstallPacketSink (nodes.Get (8), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
+  // create a dsrSender DG application
+  // create a dsrSender BE application
+  for (int i=1; i<11; i++)
+  {
+    InstallBEPacketSend (nodes.Get(0), sinkAddress_2, i-1, i, PacketSize, NPacket, i, false);
+  }
 
 
   // ---------------- Net Anim ---------------------
   AnimationInterface anim(ExpName + ".xml");
-  anim.SetConstantPosition (nodes.Get(0), 0.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(1), 0.0, 110.0);
-  anim.SetConstantPosition (nodes.Get(2), 0.0, 120.0);
-  anim.SetConstantPosition (nodes.Get(3), 10.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(4), 10.0, 110.0);
-  anim.SetConstantPosition (nodes.Get(5), 10.0, 120.0);
-  anim.SetConstantPosition (nodes.Get(6), 20.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(7), 20.0, 110.0);
-  anim.SetConstantPosition (nodes.Get(8), 20.0, 120.0);
+  // anim.SetConstantPosition (nodes.Get(0), 0.0, 100.0);
+  // anim.SetConstantPosition (nodes.Get(1), 0.0, 110.0);
+  // anim.SetConstantPosition (nodes.Get(2), 0.0, 120.0);
+  // anim.SetConstantPosition (nodes.Get(3), 10.0, 100.0);
+  // anim.SetConstantPosition (nodes.Get(4), 10.0, 110.0);
+  // anim.SetConstantPosition (nodes.Get(5), 10.0, 120.0);
+  // anim.SetConstantPosition (nodes.Get(6), 20.0, 100.0);
+  // anim.SetConstantPosition (nodes.Get(7), 20.0, 110.0);
+  // anim.SetConstantPosition (nodes.Get(8), 20.0, 120.0);
 
   // -------------- Print the routing table ----------------
   Ipv4GlobalRoutingHelper g;

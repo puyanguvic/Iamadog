@@ -34,6 +34,7 @@
 #include "dsr-route-manager.h"
 #include "cost-tag.h"
 #include "budget-tag.h"
+#include "flag-tag.h"
 #include "timestamp-tag.h"
 #include "priority-tag.h"
 
@@ -376,11 +377,14 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
        * \todo get all the possible route to the destination, and weight randomly
        * select a possbile route  
       */
+      FlagTag flagTag;
+      p->PeekPacketTag (flagTag);
       BudgetTag budgetTag;
       p->PeekPacketTag (budgetTag);
       TimestampTag timestampTag;
       p->PeekPacketTag (timestampTag);
       uint32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
+
       // std::cout << "budget = " << budget << "\n";
       // std::cout << "Old Allroute size = "<< allRoutes.size () << std::endl;
       RouteVec_t goodRoutes;
@@ -406,6 +410,10 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
       if (goodRoutes.size () == 0)
         {
           NS_LOG_ERROR ("NO ROUTE !!! " );
+          if (flagTag.GetFlagTag () == true)
+            {
+              std::cout << "DROP PACKET: NO ROUTE" << std::endl;
+            }
           return 0;
         }
       
@@ -427,7 +435,7 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
       for (uint32_t i = 0; i < goodRoutes.size (); i ++)
       {
         // weight[i] = 1.0 / (m_ipv4->GetNetDevice (allRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(allRoutes.at (i)->GetInterface()))->GetCurrentSize ().GetValue () + 0.01);
-        uint32_t dn = budget - goodRoutes.at (i)->GetDistance();
+        uint32_t dn = (budget - goodRoutes.at (i)->GetDistance())/1000;
         uint32_t ql_fast = m_ipv4->GetNetDevice (goodRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(goodRoutes.at (i)->GetInterface()))->GetInternalQueue (0)->GetCurrentSize ().GetValue ();
         uint32_t ql_slow = m_ipv4->GetNetDevice (goodRoutes.at(i)->GetInterface ())->GetNode ()->GetObject<TrafficControlLayer> ()->GetRootQueueDiscOnDevice (m_ipv4->GetNetDevice(goodRoutes.at (i)->GetInterface()))->GetInternalQueue (1)->GetCurrentSize ().GetValue ();
         uint32_t packet_size = 52;
@@ -436,9 +444,9 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
         DataRateValue dataRate;
         device->GetAttribute ("DataRate", dataRate);
         linkrate = dataRate.Get().GetBitRate ();
-        double edq_fast = ql_fast*packet_size*8 / (0.5*linkrate);
-        double edq_slow = ql_slow*packet_size*8 / (0.3*linkrate);
-        // std::cout << "edq_fast = " << edq_fast << ", edq_slow = " << edq_slow << std::endl;
+        double edq_fast = (ql_fast*packet_size*8 / (0.5*linkrate))*1000;
+        double edq_slow = (ql_slow*packet_size*8 / (0.3*linkrate))*1000;
+        
         weight [2*i] = std::max(dn - edq_fast, 0.0);
         weight [2*i+1] = std::max(dn - edq_slow, 0.0);
 
@@ -451,39 +459,73 @@ Ipv4DSRRouting::LookupDSRRoute (Ipv4Address dest, Ptr<Packet> p, Ptr<NetDevice> 
         // 
         // total_weight = sum(weight)
         // weight[i] = weight[i]/total_weight
+
+        if (flagTag.GetFlagTag () == true)
+          {
+            std::cout << "=======================================" << std::endl;
+            std::cout << "GoodRoute "<< i << " dn = " << dn << std::endl; // Check the change of queue length
+            std::cout << "GoodRoute "<< i << " fql = " << ql_fast << ", sql = " << ql_slow << std::endl; // Check the change of queue length
+            std::cout << "GoodRoute "<< i << " edq_fast = " << edq_fast << ", edq_slow = " << edq_slow << std::endl; // Check the change of estimated delay
+            std::cout << "GoodRoute "<< i << " Fast lane weight: " << weight[2*i] << " Slow lane: " << weight[2*i+1] << std::endl; // Check the change of weight
+          }
       }
+      
       if (tempSum == 0)
       {
         NS_LOG_ERROR ("All next-hops are congested!! Drop packet");
-        std::cout << "!!!! ipv4 DROP !!!!!"  << std::endl;
+        if (flagTag.GetFlagTag () == true)
+        {
+          std::cout << "DROP PACKETS: TIME OUT" << std::endl;
+        }
         return 0;
       }
 
       NS_LOG_LOGIC ("Select route by probability");
       for (uint32_t i = 0; i < goodRoutes.size () * (internalNqueue - 1); i ++)
       {
-        weight[i] = weight[i]/tempSum * 100;
+        weight[i] = (weight[i]/tempSum) * 100;
       }      
 
       for (uint32_t i = 0; i < goodRoutes.size () * (internalNqueue - 1) -1; i ++)
       {
         weight[i+1] += weight[i];
       }
-
       Ipv4DSRRoutingTableEntry* route = goodRoutes.at (0);
-      uint32_t randInt = m_rand->GetInteger (0, 100);
+      uint32_t randInt = m_rand->GetInteger (1, 100);
       uint32_t selectRouteIndex = 0;
       uint32_t selectLaneIndex = 0;
       for (uint32_t i = 0; i < goodRoutes.size () * (internalNqueue - 1); i ++)
       {
-        if (randInt >= weight[i])
+        if (randInt <= weight[i])
           {
             selectRouteIndex = i / 2;
             selectLaneIndex = i % 2;
+            break;
           }
       }
-      // std::cout << "selectNodeIndex = " << selectRouteIndex << std::endl;
-      // std::cout << "selectLaneIndex = " << selectLaneIndex << std::endl;
+
+      // NS_LOG_LOGIC ("Select optimal route with highest probability");
+      // uint32_t flag = 0;
+      // for (uint32_t i = 1; i < goodRoutes.size () * (internalNqueue - 1); i ++)
+      // {
+      //   if (weight[i] > weight[flag])
+      //     {
+      //       flag = i;
+      //     }
+      // }      
+      // uint32_t selectRouteIndex = flag / 2;
+      // uint32_t selectLaneIndex = flag % 2;
+      // Ipv4DSRRoutingTableEntry* route = goodRoutes.at (0);
+
+
+      if (flagTag.GetFlagTag () == true)
+        {
+          std::cout << "******************************************" << std::endl;
+          // std::cout << "Random number: " << randInt << std::endl;
+          std::cout << "selectRouteIndex = " << selectRouteIndex << std::endl;
+          std::cout << "selectLaneIndex = " << selectLaneIndex << std::endl;      
+        }
+
       route = goodRoutes.at (selectRouteIndex);
       PriorityTag priorityTag;
       p->RemovePacketTag (priorityTag);

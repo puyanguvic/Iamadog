@@ -164,14 +164,18 @@ main (int argc, char *argv[])
   
   // ------------------- install dsr-queue -----------------------------
   TrafficControlHelper tch1;
-  uint16_t handle1 = tch1.SetRootQueueDisc ("ns3::DsrVirtualQueueDisc");
+  tch1.SetRootQueueDisc ("ns3::DsrVirtualQueueDisc");
 
 
   for (uint32_t i = 0; i < nRows; i++ )
     {
       for (uint32_t j = 0; j < nCols; j++ )
         {
-          tch1.Install (grid.GetNode (i, j)->GetDevice (i*j));
+          std::cout <<  "Number of netDevice at " << grid.GetNode (i, j)<< " is " << grid.GetNode (i, j)->GetNDevices()<< std::endl;
+          for (uint32_t k=0; k< grid.GetNode (i, j)->GetNDevices(); k++)
+            {
+              tch1.Install (grid.GetNode (i, j)->GetDevice(k));
+            }
         }
     }
 
@@ -252,12 +256,13 @@ main (int argc, char *argv[])
 
   // create a dsrSender application
   uint32_t PacketSize = 1024;
-  uint32_t NPacket = 1000;
+  uint32_t NPacket = 1;
   uint32_t budget = 30;
-  for (int i=1; i<11; i++)
-  {
-    InstallDGPacketSend (grid.GetNode (6, 6), sinkAddress, i-1, i, PacketSize, NPacket, budget, i*10, true);
-  }
+  InstallDGPacketSend (grid.GetNode (6, 6), sinkAddress, 0, 1, PacketSize, NPacket, budget, 1, true);
+  // for (int i=1; i<11; i++)
+  // {
+  //   InstallDGPacketSend (grid.GetNode (6, 6), sinkAddress, i-1, i, PacketSize, NPacket, budget, i*10, true);
+  // }
 
 
 // ------------------------ Network DSR TCP application--------------------------------------------

@@ -8,6 +8,7 @@
 #include "priority-tag.h"
 #include "budget-tag.h"
 #include "timestamp-tag.h"
+#include "flag-tag.h"
 
 namespace ns3 {
 
@@ -47,7 +48,8 @@ bool
 DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
-
+  FlagTag flagTag;
+  item->GetPacket ()->PeekPacketTag (flagTag);
   PriorityTag priorityTag;
   uint32_t priority;
   BudgetTag budgetTag;
@@ -55,20 +57,33 @@ DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   item->GetPacket ()->PeekPacketTag (timestampTag);
   item->GetPacket ()->PeekPacketTag (budgetTag);
   int32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
-  // std::cout << " the budget = " << budget << std::endl;
+  // std::cout << "***** current budget = " << budget << std::endl;
   if (budget < 0)
     {
       NS_LOG_LOGIC ("Timeout dropping");
-      DropBeforeEnqueue (item, TIMEOUT_DROP);
+      if (flagTag.GetFlagTag () == true)
+        {
+          std::cout << "DROP PACKETS: TIME OUT" << std::endl;
+        }
+      DropBeforeEnqueue (item, TIMEOUT_DROP); // BUG: This did not work
       return false;
     }
   if(item->GetPacket ()->PeekPacketTag (priorityTag))
     {
       priority = priorityTag.GetPriority ();
+      // if (flagTag.GetFlagTag () == true)
+      //   {
+      //     std::cout<< "Enqueue to lane: "<< priority  << "queue size: "<< GetInternalQueue(priority)->GetCurrentSize ().GetValue()<< std::endl; // Check queue length
+      //   }
+      
       if(GetInternalQueue(priority)->GetCurrentSize ().GetValue() >= LinesSize[priority])
         {
           NS_LOG_LOGIC ("The Internal Queue limit exceeded -- dropping packet");
           DropBeforeEnqueue (item, LIMIT_EXCEEDED_DROP);
+          if (flagTag.GetFlagTag () == true)
+            {
+              std::cout << "DROP PACKETS: BUFFERBLOAT" << std::endl;
+            }
           return false;
         }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
       
@@ -123,8 +138,8 @@ DsrVirtualQueueDisc::DoDequeue (void)
           if (Q == B)
           {
             NS_LOG_ERROR ("Buffer bloat at band "<< i << "!!!");
-            DropAfterDequeue (item, BUFFERBLOAT_DROP);
-            std::cout << "Buffer bloat at band " << i << "!!!" << std::endl;
+            DropBeforeEnqueue (item, BUFFERBLOAT_DROP);
+            std::cout << "DROP PACKETS: NEXT CONGESTED" << std::endl;
           }
           // std::cout << "Buffer size of the lane "<< i << ": " << GetInternalQueue (i)->GetCurrentSize() << std::endl;
           // std::cout << "Number of packets in lane "<< i << ": " << GetQueueDiscClass (i)->GetQueueDisc ()->GetCurrentSize() << std::endl;         

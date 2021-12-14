@@ -39,6 +39,13 @@ Author: Xiangyu Ren
 // - UDP packet size of 1024 bytes,
 // - DropTail queues 
 // - Tracing of queues and packet receptions to file "/results/"
+/**
+ * TODO: 1. Add internal dsrqueues (fast/slow lane) with fixed buffer size (12p/36p)
+ * BUG:  1. Application sink problem
+ *       Description: For DSR application, sink node can only be set at node 6, packet can not be sent to other node.
+ *                    Also, packet can be wrongly sank at node 3 or node 7 with the change of IP interface.
+*/
+
 
 #include <iostream>
 #include <fstream>
@@ -226,12 +233,9 @@ main (int argc, char *argv[])
 
   // ------------------- install dsr-queue -----------------------------
   TrafficControlHelper tch1;
-  /**
-   * @brief To do
-   * Fast lane: 
-   * 
-   */
+
   tch1.SetRootQueueDisc ("ns3::DsrVirtualQueueDisc");
+
   
   std::vector<QueueDiscContainer> qdisc(12);
   for (int i = 0; i < 12; i ++)
@@ -241,20 +245,20 @@ main (int argc, char *argv[])
   }
 
   // ------------------- IP addresses AND Link Metric ----------------------
-  uint16_t Metric1 = 7;
-  uint16_t Metric2 = 6;
-  uint16_t Metric3 = 5;
-  uint16_t Metric4 = 4;
+  uint16_t Metric1 = 7000;
+  uint16_t Metric2 = 6000;
+  uint16_t Metric3 = 5000;
+  uint16_t Metric4 = 4000;
   
   NS_LOG_INFO ("Assign IP Addresses.");
   Ipv4AddressHelper ipv4;
   ipv4.SetBase ("10.1.1.0", "255.255.255.0");
-  Ipv4InterfaceContainer i0i1 = ipv4.Assign (devices[0]);
+  Ipv4InterfaceContainer i0i1 = ipv4.Assign (devices[2]);
   i0i1.SetMetric (0, Metric2);
   i0i1.SetMetric (1, Metric2);
 
   ipv4.SetBase ("10.1.11.0", "255.255.255.0");
-  Ipv4InterfaceContainer i0i3 = ipv4.Assign (devices[2]);
+  Ipv4InterfaceContainer i0i3 = ipv4.Assign (devices[0]);
   i0i3.SetMetric (0, Metric2);
   i0i3.SetMetric (1, Metric2);
 
@@ -373,12 +377,13 @@ main (int argc, char *argv[])
   // uint32_t PacketSize = 1024;
   // for test
   uint32_t PacketSize = 52;
-  uint32_t NPacket = 1000;
-  uint32_t budget = 30;
-  for (int i=1; i<11; i++)
-  {
-    InstallDGPacketSend (nodes.Get(2), sinkAddress, i-1, i, PacketSize, NPacket, budget, i, true);
-  }
+  uint32_t NPacket = 100;
+  uint32_t budget = 25;
+  InstallDGPacketSend (nodes.Get(2), sinkAddress, 0, 1, PacketSize, NPacket, budget, 2, true);
+  // for (int i=1; i<11; i++)
+  // {
+  //   InstallDGPacketSend (nodes.Get(2), sinkAddress, i-1, i, PacketSize, NPacket, budget, i, true);
+  // }
 
 
 // ------------------------ Network DSR TCP application--------------------------------------------
@@ -403,41 +408,38 @@ main (int argc, char *argv[])
 
   // // ---------------------------------------Network UDP Traffic C1 (n1-->n7) ------------------
 
-  // //Create a dsrSink applications 
-  // Address sinkAddress_1 (InetSocketAddress (i7i8.GetAddress (0), sinkPort));
-  // InstallPacketSink (nodes.Get (7), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
-  // // create a dsrSender application
-  // uint32_t budget_1 = 20;
-  // InstallDGPacketSend (nodes.Get (1), sinkAddress_1, 0.0, 2.0, Packetsize, NPacket, budget_1, "2Mbps", false);
+  //Create a dsrSink applications 
+  Address sinkAddress_1 (InetSocketAddress (i7i8.GetAddress (0), sinkPort));
+  InstallPacketSink (nodes.Get (7), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
+  // create a dsrSender DG application
+  uint32_t budget1 = 15;
+  for (int i=1; i<11; i++)
+  {
+    InstallDGPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize, NPacket, budget1,  i, false);
+  }
+  // create a dsrSender BE application
+  // for (int i=1; i<11; i++)
+  // {
+  //   InstallBEPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize, NPacket, i, false);
+  // }
 
-  // // create a dsrSender application
-  // uint32_t budget_11 = 14;
-  // InstallDGPacketSend (nodes.Get (1), sinkAddress_1, 0.2, 1.2, Packetsize, NPacket, budget_11, "1Mbps", false);
 
-  // // create a dsrSender application
-  // uint32_t budget_12 = 13;
-  // InstallDGPacketSend (nodes.Get (1), sinkAddress_1, 0.6, 1.6, Packetsize, NPacket, budget_12, "0.5Mbps", false);
+  // // ---------------------------------------Network Traffic C2 (n0-->n8) ------------------
+  //Create a dsrSink applications 
+  Address sinkAddress_2 (InetSocketAddress (i7i8.GetAddress (1), sinkPort));
+  InstallPacketSink (nodes.Get (8), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
+  // create a dsrSender DG application
+  uint32_t budget2 = 25;
+  for (int i=1; i<11; i++)
+  {
+    InstallDGPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize, NPacket, budget2,  i, false);
+  }
+  // // create a dsrSender BE application
+  // for (int i=1; i<11; i++)
+  // {
+  //   InstallBEPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize, NPacket, i, false);
+  // }
 
-
-  // // // ---------------------------------------Network Traffic C2 (n2-->n0) ------------------
-  // //Create a dsrSink applications 
-  // Address sinkAddress_2 (InetSocketAddress (i0i1.GetAddress (0), sinkPort));
-  // InstallPacketSink (nodes.Get (0), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
-  // // create a dsrSender application
-  // uint32_t budget_2 = 14;
-  // InstallDGPacketSend (nodes.Get (2), sinkAddress_2, 0.0, 2.0, Packetsize, NPacket, budget_2, "3Mbps", false);
-
-  // // create a dsrSender application
-  // uint32_t budget_21 = 18;
-  // InstallDGPacketSend (nodes.Get (2), sinkAddress_2, 0.3, 0.8, Packetsize, NPacket, budget_21, "2Mbps", false);
-
-  // // create a dsrSender application
-  // uint32_t budget_22 = 20;
-  // InstallDGPacketSend (nodes.Get (2), sinkAddress_2, 0.5, 1.3, Packetsize, NPacket, budget_22, "1Mbps", false);
-
-  // // create a dsrSender application
-  // uint32_t budget_23 = 13;
-  // InstallDGPacketSend (nodes.Get (2), sinkAddress_2, 0.8, 1.6, Packetsize, NPacket, budget_23, "2Mbps", false);
 
   // // ------------------------------------------------------------------
 

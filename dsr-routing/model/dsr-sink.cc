@@ -190,8 +190,8 @@ void DsrPacketSink::HandleRead (Ptr<Socket> socket)
         if (packet->PeekPacketTag(t))
         {
           uint32_t delay = Simulator::Now().GetMicroSeconds() - t.GetMicroSeconds();
-          std::cout << "Delivered!!!!!" << std::endl;
-          std::cout << "The delay in milliseconds = " << ((double)delay)/1000 << std::endl;
+          // std::cout << "Delivered!!!!!" << std::endl;
+          // std::cout << "The delay in milliseconds = " << ((double)delay)/1000 << std::endl;
           // std::cout << "Print the delay in milliseconds" << std::endl;
           std::ostream* os = m_delayStream->GetStream ();
           *os << Simulator::Now().GetSeconds() << " Delay " << delay << std::endl;
