@@ -850,7 +850,29 @@ DSRRouteManagerImpl::InitializeRoutes ()
                   Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
                   int32_t Iface = ipv4->GetInterfaceForAddress (l->GetLinkData ());
                   // std::cout << "The interface = " << Iface << std::endl;
-                  gr->AddHostRouteTo (linkRemote->GetLinkData (), linkRemote->GetLinkData (), Iface, l->GetMetric ());
+                  // gr->AddHostRouteTo (linkRemote->GetLinkData (), linkRemote->GetLinkData (), Iface, l->GetMetric ());
+
+                  // todo
+                  for (NodeList::Iterator j = NodeList::Begin (); j != listEnd; j++)
+                    {
+                      Ptr<Node> nextNode = *j;
+                      Ptr<Ipv4> nextIpv4 = nextNode->GetObject<Ipv4> ();
+                      for (uint32_t iter =0; iter < nextIpv4->GetNInterfaces (); iter ++)
+                        {
+                          Ipv4InterfaceAddress ifc = nextIpv4->GetAddress (iter,0);
+                          Ipv4Address addr = ifc.GetLocal ();
+                          if (addr == linkRemote->GetLinkData ())
+                            {
+                              std::cout << "true" << std::endl;
+                              for (uint32_t nIfc = 1; nIfc < nextIpv4->GetNInterfaces (); nIfc ++)
+                                {
+                                  gr->AddHostRouteTo (nextIpv4->GetAddress (nIfc,0).GetLocal (), linkRemote->GetLinkData (), Iface, l->GetMetric ());
+                                }
+                            }
+                        }
+                    }   
+
+
                   SPFCalculate (w_lsa->GetLinkStateId (), rtr->GetRouterId (), linkRemote, Iface);
                 }
                 else if (l->GetLinkType () == 
