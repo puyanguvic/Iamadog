@@ -377,13 +377,13 @@ main (int argc, char *argv[])
   // uint32_t PacketSize = 1024;
   // for test
   uint32_t PacketSize = 52;
-  uint32_t NPacket = 100;
+  uint32_t NPacket = 1000;
   uint32_t budget = 25;
-  InstallDGPacketSend (nodes.Get(2), sinkAddress, 0, 1, PacketSize, NPacket, budget, 2, true);
-  // for (int i=1; i<11; i++)
-  // {
-  //   InstallDGPacketSend (nodes.Get(2), sinkAddress, i-1, i, PacketSize, NPacket, budget, i, true);
-  // }
+  // InstallDGPacketSend (nodes.Get(2), sinkAddress, BeginTime, StopTime, PacketSize, NPacket, budget, 2, true);
+  for (int i=1; i<11; i++)
+  {
+    InstallDGPacketSend (nodes.Get(2), sinkAddress, (i-1)*0.5, i*0.5, PacketSize, NPacket, budget, 2+i*0.5, true);
+  }
 
 
 // ------------------------ Network DSR TCP application--------------------------------------------
@@ -406,38 +406,35 @@ main (int argc, char *argv[])
 
 
 
-  // // ---------------------------------------Network UDP Traffic C1 (n1-->n7) ------------------
-
+  // // ---------------------------------------Network UDP Traffic C1 (n2-->n3) ------------------
   //Create a dsrSink applications 
-  Address sinkAddress_1 (InetSocketAddress (i7i8.GetAddress (0), sinkPort));
-  InstallPacketSink (nodes.Get (7), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
+  Address sinkAddress_1 (InetSocketAddress (i3i6.GetAddress (0), sinkPort));
+  InstallPacketSink (nodes.Get (3), sinkPort, "ns3::UdpSocketFactory", BeginTime, StopTime);
+  // // ---------------------------------------Network Traffic C2 (n0-->n7) ------------------
+  //Create a dsrSink applications 
+  Address sinkAddress_2 (InetSocketAddress (i7i8.GetAddress (0), sinkPort));
+  InstallPacketSink (nodes.Get (7), sinkPort, "ns3::UdpSocketFactory", BeginTime, StopTime);
+  
+
+
   // create a dsrSender DG application
-  uint32_t budget1 = 15;
-  for (int i=1; i<11; i++)
-  {
-    InstallDGPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize, NPacket, budget1,  i, false);
-  }
-  // create a dsrSender BE application
+  uint32_t NPacket1 = 100000;
+  uint32_t budget1 = 20;
+  uint32_t budget2 = 20;
+  InstallDGPacketSend (nodes.Get(2), sinkAddress_1, BeginTime, StopTime, PacketSize, NPacket1, budget1, 1, false);
+  InstallDGPacketSend (nodes.Get(0), sinkAddress_2, BeginTime, StopTime, PacketSize, NPacket1, budget2, 1, false);
   // for (int i=1; i<11; i++)
   // {
-  //   InstallBEPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize, NPacket, i, false);
+  //   InstallDGPacketSend (nodes.Get(2), sinkAddress_1, (i-1)*0.5, i*0.5, PacketSize, NPacket1, budget1, 1+i*0.5, false);
+  //   InstallDGPacketSend (nodes.Get(0), sinkAddress_2, (i-1)*0.5, i*0.5, PacketSize, NPacket1, budget2, 1+i*0.5, false);
   // }
+  
 
-
-  // // ---------------------------------------Network Traffic C2 (n0-->n8) ------------------
-  //Create a dsrSink applications 
-  Address sinkAddress_2 (InetSocketAddress (i7i8.GetAddress (1), sinkPort));
-  InstallPacketSink (nodes.Get (8), sinkPort, "ns3::UdpSocketFactory", 0.0, 10.0);
-  // create a dsrSender DG application
-  uint32_t budget2 = 25;
-  for (int i=1; i<11; i++)
-  {
-    InstallDGPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize, NPacket, budget2,  i, false);
-  }
   // // create a dsrSender BE application
   // for (int i=1; i<11; i++)
   // {
-  //   InstallBEPacketSend (nodes.Get(0), sinkAddress_1, i-1, i, PacketSize, NPacket, i, false);
+  //   InstallBEPacketSend (nodes.Get(2), sinkAddress_1, (i-1)*0.5, i*0.5, PacketSize, NPacket1, 1+i*0.5, false);
+  //   InstallBEPacketSend (nodes.Get(0), sinkAddress_2, (i-1)*0.5, i*0.5, PacketSize, NPacket1, 1+i*0.5, false);
   // }
 
 
@@ -447,14 +444,14 @@ main (int argc, char *argv[])
   // ---------------- Net Anim ---------------------
   AnimationInterface anim(ExpName + ".xml");
   anim.SetConstantPosition (nodes.Get(0), 0.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(1), 0.0, 110.0);
-  anim.SetConstantPosition (nodes.Get(2), 0.0, 120.0);
-  anim.SetConstantPosition (nodes.Get(3), 10.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(4), 10.0, 110.0);
-  anim.SetConstantPosition (nodes.Get(5), 10.0, 120.0);
-  anim.SetConstantPosition (nodes.Get(6), 20.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(7), 20.0, 110.0);
-  anim.SetConstantPosition (nodes.Get(8), 20.0, 120.0);
+  anim.SetConstantPosition (nodes.Get(1), 0.0, 130.0);
+  anim.SetConstantPosition (nodes.Get(2), 0.0, 160.0);
+  anim.SetConstantPosition (nodes.Get(3), 30.0, 100.0);
+  anim.SetConstantPosition (nodes.Get(4), 30.0, 130.0);
+  anim.SetConstantPosition (nodes.Get(5), 30.0, 160.0);
+  anim.SetConstantPosition (nodes.Get(6), 60.0, 100.0);
+  anim.SetConstantPosition (nodes.Get(7), 60.0, 130.0);
+  anim.SetConstantPosition (nodes.Get(8), 60.0, 160.0);
 
   // -------------- Print the routing table ----------------
   Ipv4DSRRoutingHelper d;
