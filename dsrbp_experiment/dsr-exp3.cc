@@ -58,6 +58,8 @@ Author: Xiangyu Ren
 #include "ns3/netanim-module.h"
 #include "ns3/traffic-control-module.h"
 #include "ns3/dsr-routing-module.h"
+#include "ns3/point-to-point-grid.h"
+#include "ns3/node-list.h"
 
 using namespace ns3;  
 
@@ -80,14 +82,12 @@ CheckQueueSize (Ptr<QueueDisc> queueDisc, std::string qID)
   fPlotQueue.close ();
 }
 
-
-// // Function to calculate drops in a particular Queue
-static void
-DropAtQueue (Ptr<OutputStreamWrapper> stream, Ptr<const QueueDiscItem> item)
-{
-  *stream->GetStream () << Simulator::Now ().GetSeconds () << " 1" << std::endl;
-}
-
+// // // Function to calculate drops in a particular Queue
+// static void
+// DropAtQueue (Ptr<OutputStreamWrapper> stream, Ptr<const QueueDiscItem> item)
+// {
+//   *stream->GetStream () << Simulator::Now ().GetSeconds () << " 1" << std::endl;
+// }
 
 // Function to install dsrSink application
 void InstallPacketSink (Ptr<Node> node, uint16_t port, std::string socketFactory, double startTime, double stopTime)
@@ -124,7 +124,6 @@ void InstallBEPacketSend (Ptr<Node> node, Address sinkAddress, double startTime,
   dsrApp->SetStopTime (Seconds (stopTime));
 }
 
-
 NS_LOG_COMPONENT_DEFINE (ExpName);
 
 int 
@@ -136,317 +135,100 @@ main (int argc, char *argv[])
   LogComponentEnable (ExpName, LOG_LEVEL_INFO);
 #endif
 
-  // Set up some default values for the simulation.  Use the 
-  Config::SetDefault ("ns3::OnOffApplication::PacketSize", UintegerValue (1000));
-  Config::SetDefault ("ns3::OnOffApplication::DataRate", StringValue ("5Mb/s"));
-  Config::SetDefault ("ns3::FifoQueueDisc::MaxSize", QueueSizeValue (QueueSize ("35p")));
-  //DefaultValue::Bind ("DropTailQueue::m_maxPackets", 30);
-
   // Allow the user to override any of the defaults and the above
   // DefaultValue::Bind ()s at run-time, via command-line arguments
   CommandLine cmd (__FILE__);
   bool enableFlowMonitor = false;
   cmd.AddValue ("EnableMonitor", "Enable Flow Monitor", enableFlowMonitor);
   cmd.Parse (argc, argv);
-
-  // ------------------ build topology ---------------------------
-  NS_LOG_INFO ("Create nodes.");
-  NodeContainer nodes;
-  nodes.Create(9);
-  NodeContainer n0n1 = NodeContainer(nodes.Get(0), nodes.Get(1));
-  NodeContainer n1n2 = NodeContainer(nodes.Get(1), nodes.Get(2));
-  NodeContainer n0n3 = NodeContainer(nodes.Get(0), nodes.Get(3));
-  NodeContainer n3n4 = NodeContainer(nodes.Get(3), nodes.Get(4));
-  NodeContainer n1n4 = NodeContainer(nodes.Get(1), nodes.Get(4));
-  NodeContainer n4n5 = NodeContainer(nodes.Get(4), nodes.Get(5));
-  NodeContainer n2n5 = NodeContainer(nodes.Get(2), nodes.Get(5));
-  NodeContainer n3n6 = NodeContainer(nodes.Get(3), nodes.Get(6));
-  NodeContainer n6n7 = NodeContainer(nodes.Get(6), nodes.Get(7));
-  NodeContainer n4n7 = NodeContainer(nodes.Get(4), nodes.Get(7));
-  NodeContainer n7n8 = NodeContainer(nodes.Get(7), nodes.Get(8));
-  NodeContainer n5n8 = NodeContainer(nodes.Get(5), nodes.Get(8));
-
-  // ------------------- install internet protocol to nodes-----------
-  NS_LOG_INFO ("Enabling DSR Routing.");
+  // ------------------ build topology --------------------------
+  NS_LOG_INFO ("Build grid topology");
   Ipv4DSRRoutingHelper dsr;
-
-  // Ipv4StaticRoutingHelper staticRouting;
-
   Ipv4ListRoutingHelper list;
-  // list.Add (staticRouting, 0);
   list.Add (dsr, 10);
-
   InternetStackHelper internet;
-  internet.SetRoutingHelper (list); // has effect on the next Install ()
-  internet.Install (nodes);
-
-  // ----------------create the channels -----------------------------
-  NS_LOG_INFO ("Create channels.");
-  PointToPointHelper p2p; 
-  // PointToPointHelper p2p2; 
-  // PointToPointHelper p2p3; 
-  // PointToPointHelper p2p4; 
-
-  std::string channelDataRate1 = "10Mbps"; // link data rate (High)
-  std::string channelDataRate2 = "5Mbps"; // link data rate (low)
-  uint32_t delayInMicro1 = 3000; // transmission + propagation delay (Short)
-  uint32_t delayInMicro2 = 5000; // transmission + propagation delay (Long)
-  double BeginTime = 0.0;
-  double StopTime = 10.0; // Simulation stop time
-  std::vector<NetDeviceContainer> devices(12);
-
-  // High capacity link + Short base delay
-  p2p.SetDeviceAttribute ("DataRate", DataRateValue (DataRate (channelDataRate1)));
-  p2p.SetChannelAttribute ("Delay", TimeValue (MicroSeconds(delayInMicro1)));
-  devices[10] = p2p.Install (n2n5);
-  devices[5] = p2p.Install (n1n4);
-  devices[9] = p2p.Install (n7n8);
-  devices[1] = p2p.Install (n3n6);
-  devices[6] = p2p.Install (n4n7);
-
-  // High capacity link + Long base delay
-  p2p.SetDeviceAttribute ("DataRate", DataRateValue (DataRate (channelDataRate1)));
-  p2p.SetChannelAttribute ("Delay", TimeValue (MicroSeconds(delayInMicro2)));
-  devices[2] = p2p.Install (n0n1);
-  devices[8] = p2p.Install (n4n5);
-
-
-  // Low capacity link + Short base delay
-  p2p.SetDeviceAttribute ("DataRate", DataRateValue (DataRate (channelDataRate2)));
-  p2p.SetChannelAttribute ("Delay", TimeValue (MicroSeconds(delayInMicro1)));
-  devices[0] = p2p.Install (n0n3);
-  devices[7] = p2p.Install (n1n2);
-
-
-
-  // Low capacity link + Long base delay
-  p2p.SetDeviceAttribute ("DataRate", DataRateValue (DataRate (channelDataRate2)));
-  p2p.SetChannelAttribute ("Delay", TimeValue (MicroSeconds(delayInMicro2)));
-  devices[4] = p2p.Install (n6n7);
-  devices[3] = p2p.Install (n3n4);
-  devices[11] = p2p.Install (n5n8);
-
-  // ------------------- install dsr-queue -----------------------------
-  TrafficControlHelper tch1;
-
-  tch1.SetRootQueueDisc ("ns3::DsrVirtualQueueDisc");
-
-  
-  std::vector<QueueDiscContainer> qdisc(12);
-  for (int i = 0; i < 12; i ++)
-  {
-    // tch.Uninstall (devices[i]);
-    qdisc[i] = tch1.Install (devices[i]);
-  }
-
-  // ------------------- IP addresses AND Link Metric ----------------------
-  uint16_t Metric1 = 7000;
-  uint16_t Metric2 = 6000;
-  uint16_t Metric3 = 5000;
-  uint16_t Metric4 = 4000;
-  
-  NS_LOG_INFO ("Assign IP Addresses.");
-  Ipv4AddressHelper ipv4;
-  ipv4.SetBase ("10.1.1.0", "255.255.255.0");
-  Ipv4InterfaceContainer i0i1 = ipv4.Assign (devices[2]);
-  i0i1.SetMetric (0, Metric2);
-  i0i1.SetMetric (1, Metric2);
-
-  ipv4.SetBase ("10.1.11.0", "255.255.255.0");
-  Ipv4InterfaceContainer i0i3 = ipv4.Assign (devices[0]);
-  i0i3.SetMetric (0, Metric2);
-  i0i3.SetMetric (1, Metric2);
-
-  ipv4.SetBase ("10.1.2.0", "255.255.255.0");
-  Ipv4InterfaceContainer i1i2 = ipv4.Assign (devices[7]);
-  i1i2.SetMetric (0, Metric3);
-  i1i2.SetMetric (1, Metric3);
-
-  ipv4.SetBase ("10.1.12.0", "255.255.255.0");
-  Ipv4InterfaceContainer i1i4 = ipv4.Assign (devices[5]);
-  i1i4.SetMetric (0, Metric4);
-  i1i4.SetMetric (1, Metric4);
-
-  ipv4.SetBase ("10.1.13.0", "255.255.255.0");
-  Ipv4InterfaceContainer i2i5 = ipv4.Assign (devices[10]);
-  i2i5.SetMetric (0, Metric4);
-  i2i5.SetMetric (1, Metric4);
-
-  ipv4.SetBase ("10.1.4.0", "255.255.255.0");
-  Ipv4InterfaceContainer i3i4 = ipv4.Assign (devices[3]);
-  i3i4.SetMetric (0, Metric1);
-  i3i4.SetMetric (1, Metric1);
-
-  ipv4.SetBase ("10.1.14.0", "255.255.255.0");
-  Ipv4InterfaceContainer i3i6 = ipv4.Assign (devices[1]);
-  i3i6.SetMetric (0, Metric4);
-  i3i6.SetMetric (1, Metric4);
-
-  ipv4.SetBase ("10.1.5.0", "255.255.255.0");
-  Ipv4InterfaceContainer i4i5 = ipv4.Assign (devices[8]);
-  i4i5.SetMetric (0, Metric2);
-  i4i5.SetMetric (1, Metric2);
-
-  ipv4.SetBase ("10.1.15.0", "255.255.255.0");
-  Ipv4InterfaceContainer i4i7 = ipv4.Assign (devices[6]);
-  i4i7.SetMetric (0, Metric4);
-  i4i7.SetMetric (1, Metric4);
-
-  ipv4.SetBase ("10.1.16.0", "255.255.255.0");
-  Ipv4InterfaceContainer i5i8 = ipv4.Assign (devices[11]); 
-  i5i8.SetMetric (0, Metric1);
-  i5i8.SetMetric (1, Metric1);
-
-  ipv4.SetBase ("10.1.7.0", "255.255.255.0");
-  Ipv4InterfaceContainer i6i7 = ipv4.Assign (devices[4]);
-  i6i7.SetMetric (0, Metric1);
-  i6i7.SetMetric (1, Metric1);
-
-  ipv4.SetBase ("10.1.8.0", "255.255.255.0");
-  Ipv4InterfaceContainer i7i8 = ipv4.Assign (devices[9]);
-  i7i8.SetMetric (0, Metric4);
-  i7i8.SetMetric (1, Metric4);
-
-  // ---------------- Create routingTable ---------------------
-  Ipv4DSRRoutingHelper::PopulateRoutingTables ();
-
-  // ---------------- Schedule Recording Events ---------------
-  // Create directories to store dat files
-  struct stat buffer;
-  int retVal;
-  if ((stat (dir.c_str (), &buffer)) == 0)
+  internet.SetRoutingHelper (list);
+  uint32_t nRows = 3;
+  uint32_t nCols = 3;
+  PointToPointHelper p2p;
+  PointToPointGridHelper p2pGrid(3,3,p2p);
+  // install DSR-BP to the grid
+  p2pGrid.InstallStack (internet);
+  // install dsr-queue
+  TrafficControlHelper tch;
+  tch.SetRootQueueDisc ("ns3::DsrVirtualQueueDisc");
+  for (uint32_t i = 0; i < nRows; i ++)
     {
-      std::string dirToRemove = "rm -rf " + dir;
-      retVal = system (dirToRemove.c_str ());
-      NS_ASSERT_MSG (retVal == 0, "Error in return value");
+      for (uint32_t j = 0; j < nCols; j ++)
+        {
+          Ptr<Node> node = p2pGrid.GetNode (i, j);
+          Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
+          for (uint32_t k = 0; k < node->GetNDevices (); k ++)
+            {
+              Ptr<NetDevice> dev = node->GetDevice (k);
+              tch.Install (dev);
+            }
+        }
     }
-  std::string dirToSave = "mkdir -p " + dir;
-  retVal = system (dirToSave.c_str ());
-  NS_ASSERT_MSG (retVal == 0, "Error in return value");
-  retVal = system ((dirToSave + "/queueTraces/").c_str ());
-  NS_ASSERT_MSG (retVal == 0, "Error in return value");
-  NS_UNUSED (retVal);
 
-  // Calls function to check queue size
-  std::string qID1f = "n1n2-0";
-  Simulator::ScheduleNow (&CheckQueueSize, qdisc[7].Get (1), qID1f);
-  // std::string qID1s = "n1n2-1";
-  // Simulator::ScheduleNow (&CheckQueueSize, qdisc[7].Get (1)->GetQueueDiscClass(1), qID1s);
-  // std::string qID1n = "n1n2-2";
-  // Simulator::ScheduleNow (&CheckQueueSize, qdisc[7].Get (1)->GetQueueDiscClass(2), qID1n);
+  // -------------- Set Metric --------------------------
+  for (uint32_t i = 0; i < nRows; i ++)
+    {
+      for (uint32_t j = 0; j < nCols; j ++)
+        {
+          std::cout << i << "," << j << std::endl;
+          Ptr<Ipv4> ipv4 = p2pGrid.GetNode (i,j)->GetObject<Ipv4> ();
+          std::cout << ipv4->GetNInterfaces () << std::endl;
+          for (uint32_t k = 1; k < ipv4->GetNInterfaces (); k ++)
+            {
+              // Ptr<NetDevice> dev = ipv4->GetNetDevice (k);
+              // DataRateValue dataRate;
+              // dev->GetAttribute ("DataRate", dataRate);
+              // uint32_t matric = dataRate.Get ().GetBitRate ();
+              Ptr<Channel> channel = ipv4->GetNetDevice (k)->GetChannel ();
+              TimeValue delay;
+              channel->GetAttribute ("Delay", delay);
+              uint32_t matric = delay.Get ().GetMicroSeconds ();
+              ipv4->SetMetric(k, matric);
+              std::cout << "the matric = " << matric << std::endl;
+            }
+        } 
+    }
+  // // ---------------- Create routingTable ---------------------
+  Ipv4DSRRoutingHelper::PopulateRoutingTables ();
+  // Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
-  // std::string qID2f = "n1n4-0";
-  // Simulator::ScheduleNow (&CheckQueueSize, qdiscs9.Get (0)->GetQueueDiscClass(0), qID2f);
-  // std::string qID2s = "n1n4-1";
-  // Simulator::ScheduleNow (&CheckQueueSize, qdiscs9.Get (0)->GetQueueDiscClass(1), qID2s);
-  // std::string qID2n = "n1n4-2";
-  // Simulator::ScheduleNow (&CheckQueueSize, qdiscs9.Get (0)->GetQueueDiscClass(2), qID2n);
-
-  // Create .dat to store packets dropped and marked at the router
-  AsciiTraceHelper asciiTraceHelper;
-  Ptr<OutputStreamWrapper> streamWrapper;
-
-  streamWrapper = asciiTraceHelper.CreateFileStream (dir + "/queueTraces/drop-n4n7.dat");
-  qdisc[7].Get(1)->TraceConnectWithoutContext ("Drop", MakeBoundCallback (&DropAtQueue, streamWrapper));
-  // streamWrapper = asciiTraceHelper.CreateFileStream (dir + "/queueTraces/drop-n1n4.dat");
-  // qdiscs9.Get(0)-> TraceConnectWithoutContext ("Drop", MakeBoundCallback (&DropAtQueue, streamWrapper));
-  // streamWrapper = asciiTraceHelper.CreateFileStream (dir + "/queueTraces/drop-n4n7.dat");
-  // qdiscs10.Get(0)-> TraceConnectWithoutContext ("Drop", MakeBoundCallback (&DropAtQueue, streamWrapper));
-
-  // Store queue stats in a file
-  std::ofstream myfile;
-  myfile.open (dir + "/queueTraces/queueStats.txt", std::fstream::in | std::fstream::out | std::fstream::app);
-  myfile << std::endl;
-  myfile << "Stat for Queue 0";
-  myfile << qdisc[7].Get(0)->GetStats ();
-  myfile.close ();
-
-
+  //---------------- Application ---------------
+  // uint32_t beginTime = 0;
+  uint32_t stopTime = 10.0;
   // ------------------------------------*** DSR Traffic Target Flow (n2 --> n6)-------------------------------------  
-   //Create a dsrSink applications 
-  uint16_t sinkPort = 8080;
-  Address sinkAddress (InetSocketAddress (i6i7.GetAddress (0), sinkPort));
-  InstallPacketSink (nodes.Get (6), sinkPort, "ns3::UdpSocketFactory", BeginTime, StopTime);
-
-  // create a dsrSender application
-  // uint32_t PacketSize = 1024;
-  // for test
-  uint32_t PacketSize = 52;
-  uint32_t NPacket = 1000;
-  uint32_t budget = 30;
-  // InstallDGPacketSend (nodes.Get(2), sinkAddress, BeginTime, StopTime, PacketSize, NPacket, budget, 2, true);
-  for (int i=1; i<11; i++)
-  {
-    InstallDGPacketSend (nodes.Get(2), sinkAddress, (i-1)*0.5, i*0.5, PacketSize, NPacket, budget-i, 2, true);
-  }
-
-
-// ------------------------ Network DSR TCP application--------------------------------------------
+  //Create a dsrSink applications 
   // uint16_t sinkPort = 8080;
-  // Address sinkAddress (InetSocketAddress (i0i1.GetAddress (1), sinkPort));
-  // PacketSinkHelper packetSinkHelper ("ns3::TcpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), sinkPort));
-  // ApplicationContainer sinkApps = packetSinkHelper.Install (nodes.Get (1));
-  // sinkApps.Start (Seconds (0.));
-  // sinkApps.Stop (Seconds (10.));
+  // Ptr<Node> sinkNode = p2pGrid.GetNode (0, 0);
+  // Ptr<NetDevice> sinkDev = sinkNode->GetDevice (0);
+  // Ptr<Ipv4> ipv4 = sinkNode->GetObject<Ipv4> ();
+  // int32_t interface = ipv4->GetInterfaceForDevice (sinkDev);
+  // Address sinkAddress (InetSocketAddress (addr, sinkPort));
+  // addr.Print (std::cout);
+ 
+  // InstallPacketSink (sinkNode, sinkPort, "ns3::UdpSocketFactory", beginTime, stopTime);
 
-  // Ptr<Socket> ns3TcpSocket = Socket::CreateSocket (nodes.Get (0), TcpSocketFactory::GetTypeId ());
-  // // ns3TcpSocket->TraceConnectWithoutContext ("CongestionWindow", MakeCallback (&CwndChange));
-
-  // Ptr<DsrApplication> app = CreateObject<DsrApplication> ();
-  // uint32_t budget = 40;
-  // app->Setup (ns3TcpSocket, sinkAddress, 1040, 1000, DataRate ("1Mbps"), budget);
-  // nodes.Get (0)->AddApplication (app);
-  // app->SetStartTime (Seconds (1.));
-  // app->SetStopTime (Seconds (10.));
-
-
-
-  // // ---------------------------------------Network UDP Traffic C1 (n2-->n3) ------------------
-  //Create a dsrSink applications 
-  Address sinkAddress_1 (InetSocketAddress (i3i6.GetAddress (0), sinkPort));
-  InstallPacketSink (nodes.Get (3), sinkPort, "ns3::UdpSocketFactory", BeginTime, StopTime);
-  // // ---------------------------------------Network Traffic C2 (n0-->n7) ------------------
-  //Create a dsrSink applications 
-  Address sinkAddress_2 (InetSocketAddress (i7i8.GetAddress (0), sinkPort));
-  InstallPacketSink (nodes.Get (7), sinkPort, "ns3::UdpSocketFactory", BeginTime, StopTime);
-  
-
-
-  // create a dsrSender DG application
-  uint32_t NPacket1 = 100000;
-  uint32_t budget1 = 20;
-  uint32_t budget2 = 20;
-  InstallDGPacketSend (nodes.Get(2), sinkAddress_1, BeginTime, StopTime, PacketSize, NPacket1, budget1, 2, false);
-  InstallDGPacketSend (nodes.Get(0), sinkAddress_2, BeginTime, StopTime, PacketSize, NPacket1, budget2, 2, false);
-  // for (int i=1; i<11; i++)
+  // // create a dsrSender application
+  // // uint32_t PacketSize = 1024;
+  // // for test
+  // uint32_t PacketSize = 52;
+  // uint32_t NPacket = 1;
+  // uint32_t budget = 20;
+  // for (int i=1; i<2; i++)
   // {
-  //   InstallDGPacketSend (nodes.Get(2), sinkAddress_1, (i-1)*0.5, i*0.5, PacketSize, NPacket1, budget1, 1+i*0.5, false);
-  //   InstallDGPacketSend (nodes.Get(0), sinkAddress_2, (i-1)*0.5, i*0.5, PacketSize, NPacket1, budget2, 1+i*0.5, false);
-  // }
-  
-
-  // // create a dsrSender BE application
-  // for (int i=1; i<11; i++)
-  // {
-  //   InstallBEPacketSend (nodes.Get(2), sinkAddress_1, (i-1)*0.5, i*0.5, PacketSize, NPacket1, 1+i*0.5, false);
-  //   InstallBEPacketSend (nodes.Get(0), sinkAddress_2, (i-1)*0.5, i*0.5, PacketSize, NPacket1, 1+i*0.5, false);
+  //   InstallDGPacketSend (nodes.Get(2), sinkAddress, i-1, i, PacketSize, NPacket, budget, i, true);
   // }
 
 
-  // // ------------------------------------------------------------------
 
 
   // ---------------- Net Anim ---------------------
   AnimationInterface anim(ExpName + ".xml");
-  anim.SetConstantPosition (nodes.Get(0), 0.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(1), 0.0, 130.0);
-  anim.SetConstantPosition (nodes.Get(2), 0.0, 160.0);
-  anim.SetConstantPosition (nodes.Get(3), 30.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(4), 30.0, 130.0);
-  anim.SetConstantPosition (nodes.Get(5), 30.0, 160.0);
-  anim.SetConstantPosition (nodes.Get(6), 60.0, 100.0);
-  anim.SetConstantPosition (nodes.Get(7), 60.0, 130.0);
-  anim.SetConstantPosition (nodes.Get(8), 60.0, 160.0);
 
   // -------------- Print the routing table ----------------
   Ipv4DSRRoutingHelper d;
@@ -456,7 +238,7 @@ main (int argc, char *argv[])
 
   // --------------- Store Recorded .dat --------------------
   NS_LOG_INFO ("Run Simulation.");
-  Simulator::Stop (Seconds (StopTime));
+  Simulator::Stop (Seconds (stopTime));
   Simulator::Run ();
 
   Simulator::Destroy ();
