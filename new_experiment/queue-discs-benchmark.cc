@@ -1,4 +1,57 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+/*
+ * Copyright (c) 2015 Universita' degli Studi di Napoli Federico II
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation;
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Authors: Pasquale Imputato <p.imputato@gmail.com>
+ *          Stefano Avallone <stefano.avallone@unina.it>
+ */
+
+// This example serves as a benchmark for all the queue discs (with BQL enabled or not)
+//
+// Network topology
+//
+//                192.168.1.0                             192.168.2.0
+// n1 ------------------------------------ n2 ----------------------------------- n3
+//   point-to-point (access link)                point-to-point (bottleneck link)
+//   100 Mbps, 0.1 ms                            bandwidth [10 Mbps], delay [5 ms]
+//   qdiscs PfifoFast with capacity              qdiscs queueDiscType in {PfifoFast, ARED, CoDel, FqCoDel, PIE} [PfifoFast]
+//   of 1000 packets                             with capacity of queueDiscSize packets [1000]
+//   netdevices queues with size of 100 packets  netdevices queues with size of netdevicesQueueSize packets [100]
+//   without BQL                                 bql BQL [false]
+//   *** fixed configuration ***
+//
+// Two TCP flows are generated: one from n1 to n3 and the other from n3 to n1.
+// Additionally, n1 pings n3, so that the RTT can be measured.
+//
+// The output will consist of a number of ping Rtt such as:
+//
+//    /NodeList/0/ApplicationList/2/$ns3::V4Ping/Rtt=111 ms
+//    /NodeList/0/ApplicationList/2/$ns3::V4Ping/Rtt=111 ms
+//    /NodeList/0/ApplicationList/2/$ns3::V4Ping/Rtt=110 ms
+//    /NodeList/0/ApplicationList/2/$ns3::V4Ping/Rtt=111 ms
+//    /NodeList/0/ApplicationList/2/$ns3::V4Ping/Rtt=111 ms
+//    /NodeList/0/ApplicationList/2/$ns3::V4Ping/Rtt=112 ms
+//    /NodeList/0/ApplicationList/2/$ns3::V4Ping/Rtt=111 ms
+//
+// The files output will consist of a trace file with bytes in queue and of a trace file for limits
+// (when BQL is enabled) both for bottleneck NetDevice on n2, two files with upload and download
+// goodput for flows configuration and a file with flow monitor stats.
+//
+// If you use an AQM as queue disc on the bottleneck netdevices, you can observe that the ping Rtt
+// decrease. A further decrease can be observed when you enable BQL.
 
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
@@ -8,7 +61,6 @@
 #include "ns3/internet-apps-module.h"
 #include "ns3/traffic-control-module.h"
 #include "ns3/flow-monitor-module.h"
-#include "ns3/dsr-routing-module.h"
 
 using namespace ns3;
 
@@ -45,7 +97,7 @@ int main (int argc, char *argv[])
 {
   std::string bandwidth = "10Mbps";
   std::string delay = "5ms";
-  std::string queueDiscType = "DsrVirtualQueueDisc";
+  std::string queueDiscType = "PfifoFast";
   uint32_t queueDiscSize = 1000;
   uint32_t netdevicesQueueSize = 50;
   bool bql = false;
@@ -57,7 +109,7 @@ int main (int argc, char *argv[])
   float simDuration = 60;
   float samplingPeriod = 1;
 
-  CommandLine cmd (__FILE__);
+  CommandLine cmd;
   cmd.AddValue ("bandwidth", "Bottleneck bandwidth", bandwidth);
   cmd.AddValue ("delay", "Bottleneck delay", delay);
   cmd.AddValue ("queueDiscType", "Bottleneck queue disc type in {PfifoFast, ARED, CoDel, FqCoDel, PIE, prio}", queueDiscType);
@@ -83,28 +135,70 @@ int main (int argc, char *argv[])
   PointToPointHelper accessLink;
   accessLink.SetDeviceAttribute ("DataRate", StringValue ("100Mbps"));
   accessLink.SetChannelAttribute ("Delay", StringValue ("0.1ms"));
-  accessLink.SetQueue ("ns3::DropTailQueue", "MaxSize", StringValue ("100p"));
 
   PointToPointHelper bottleneckLink;
   bottleneckLink.SetDeviceAttribute ("DataRate", StringValue (bandwidth));
   bottleneckLink.SetChannelAttribute ("Delay", StringValue (delay));
-  bottleneckLink.SetQueue ("ns3::DropTailQueue", "MaxSize", StringValue (std::to_string (netdevicesQueueSize) + "p"));
 
   InternetStackHelper stack;
   stack.InstallAll ();
 
   // Access link traffic control configuration
   TrafficControlHelper tchPfifoFastAccess;
-  tchPfifoFastAccess.SetRootQueueDisc ("ns3::DsrVirtualQueueDisc", "MaxSize", StringValue ("1000p"));
+  tchPfifoFastAccess.SetRootQueueDisc ("ns3::PfifoFastQueueDisc", "MaxSize", StringValue ("1000p"));
 
   // Bottleneck link traffic control configuration
   TrafficControlHelper tchBottleneck;
 
-  if (queueDiscType.compare ("DsrVirtualQueueDisc") == 0)
+  if (queueDiscType.compare ("PfifoFast") == 0)
     {
-      tchBottleneck.SetRootQueueDisc ("ns3::DsrVirtualQueueDisc", "MaxSize",
+      tchBottleneck.SetRootQueueDisc ("ns3::PfifoFastQueueDisc", "MaxSize",
                                       QueueSizeValue (QueueSize (QueueSizeUnit::PACKETS, queueDiscSize)));
     }
+  else if (queueDiscType.compare ("ARED") == 0)
+    {
+      tchBottleneck.SetRootQueueDisc ("ns3::RedQueueDisc");
+      Config::SetDefault ("ns3::RedQueueDisc::ARED", BooleanValue (true));
+      Config::SetDefault ("ns3::RedQueueDisc::MaxSize",
+                          QueueSizeValue (QueueSize (QueueSizeUnit::PACKETS, queueDiscSize)));
+    }
+  else if (queueDiscType.compare ("CoDel") == 0)
+    {
+      tchBottleneck.SetRootQueueDisc ("ns3::CoDelQueueDisc");
+      Config::SetDefault ("ns3::CoDelQueueDisc::MaxSize",
+                          QueueSizeValue (QueueSize (QueueSizeUnit::PACKETS, queueDiscSize)));
+    }
+  else if (queueDiscType.compare ("FqCoDel") == 0)
+    {
+      tchBottleneck.SetRootQueueDisc ("ns3::FqCoDelQueueDisc");
+      Config::SetDefault ("ns3::FqCoDelQueueDisc::MaxSize",
+                          QueueSizeValue (QueueSize (QueueSizeUnit::PACKETS, queueDiscSize)));
+    }
+  else if (queueDiscType.compare ("PIE") == 0)
+    {
+      tchBottleneck.SetRootQueueDisc ("ns3::PieQueueDisc");
+      Config::SetDefault ("ns3::PieQueueDisc::MaxSize",
+                          QueueSizeValue (QueueSize (QueueSizeUnit::PACKETS, queueDiscSize)));
+    }
+  else if (queueDiscType.compare ("prio") == 0)
+    {
+      uint16_t handle = tchBottleneck.SetRootQueueDisc ("ns3::PrioQueueDisc", "Priomap",
+                                                        StringValue ("0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1"));
+      TrafficControlHelper::ClassIdList cid = tchBottleneck.AddQueueDiscClasses (handle, 2, "ns3::QueueDiscClass");
+      tchBottleneck.AddChildQueueDisc (handle, cid[0], "ns3::FifoQueueDisc");
+      tchBottleneck.AddChildQueueDisc (handle, cid[1], "ns3::RedQueueDisc");
+    }
+  else
+    {
+      NS_ABORT_MSG ("--queueDiscType not valid");
+    }
+
+  if (bql)
+    {
+      tchBottleneck.SetQueueLimits ("ns3::DynamicQueueLimits");
+    }
+
+  Config::SetDefault ("ns3::QueueBase::MaxSize", StringValue ("100p"));
 
   NetDeviceContainer devicesAccessLink = accessLink.Install (n1.Get (0), n2.Get (0));
   tchPfifoFastAccess.Install (devicesAccessLink);
@@ -112,6 +206,8 @@ int main (int argc, char *argv[])
   address.SetBase ("192.168.0.0", "255.255.255.0");
   address.NewNetwork ();
   Ipv4InterfaceContainer interfacesAccess = address.Assign (devicesAccessLink);
+
+  Config::SetDefault ("ns3::QueueBase::MaxSize", StringValue (std::to_string (netdevicesQueueSize) + "p"));
 
   NetDeviceContainer devicesBottleneckLink = bottleneckLink.Install (n2.Get (0), n3.Get (0));
   QueueDiscContainer qdiscs;

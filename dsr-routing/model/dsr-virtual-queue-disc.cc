@@ -55,15 +55,24 @@ DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   BudgetTag budgetTag;
   TimestampTag timestampTag;
   item->GetPacket ()->PeekPacketTag (timestampTag);
+  
+  // Enqueue Best-Effort to best effort lane
+  if (!item->GetPacket ()->PeekPacketTag (budgetTag))
+  {
+    bool retval = GetInternalQueue (2)->Enqueue (item);
+    return retval;
+  }
+
   item->GetPacket ()->PeekPacketTag (budgetTag);
   int32_t budget = budgetTag.GetBudget () + timestampTag.GetMicroSeconds () - Simulator::Now().GetMicroSeconds ();
   // std::cout << "***** current budget = " << budget << std::endl;
+  
   if (budget < 0)
     {
       NS_LOG_LOGIC ("Timeout dropping");
       if (flagTag.GetFlagTag () == true)
         {
-          std::cout << "DROP PACKETS: TIME OUT" << std::endl;
+          std::cout << "DROP PACKETS BEFORE ENQUEUE: TIME OUT" << std::endl;
         }
       DropBeforeEnqueue (item, TIMEOUT_DROP); // BUG: This did not work
       return false;
@@ -80,6 +89,7 @@ DsrVirtualQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
         {
           NS_LOG_LOGIC ("The Internal Queue limit exceeded -- dropping packet");
           DropBeforeEnqueue (item, LIMIT_EXCEEDED_DROP);
+          std::cout << "DROP PACKETS: BUFFERBLOAT" << std::endl;
           if (flagTag.GetFlagTag () == true)
             {
               std::cout << "DROP PACKETS: BUFFERBLOAT" << std::endl;
@@ -114,39 +124,18 @@ DsrVirtualQueueDisc::DoDequeue (void)
   NS_LOG_FUNCTION (this);
 
   Ptr<QueueDiscItem> item;
-
-  // for (uint32_t i = 0; i < GetNInternalQueues (); i++)
-  //   {
-  //     if ((item = GetInternalQueue (i)->Dequeue ()) != 0)
-  //       {
-  //         NS_LOG_LOGIC ("Popped from band " << i << ": " << item);
-  //         NS_LOG_LOGIC ("Number packets band " << i << ": " << GetInternalQueue (i)->GetNPackets ());
-  //         return item;
-  //       }
-  //   }
-
-  uint32_t weight[3]= {5, 3, 2};  
-  for (uint32_t i = 0; i < GetNInternalQueues (); i++)
+  uint32_t prio = Classify ();
+  if (prio == 88)
+  {
+    return 0;
+  }
+  if (item = GetInternalQueue (prio)->Dequeue ())
     {
-      uint32_t account = weight[i];
-      if (-- account >= 0 && (item = GetInternalQueue (i)->Dequeue ()) != 0)
-        {
-          NS_LOG_LOGIC ("Popped from band " << i << ": " << item);
-          NS_LOG_LOGIC ("Number packets band " << i << ": " << GetInternalQueue (i)->GetNPackets ());
-          QueueSize Q = GetInternalQueue (i)->GetCurrentSize();
-          QueueSize B = GetInternalQueue (i)->GetMaxSize();
-          if (Q == B)
-          {
-            NS_LOG_ERROR ("Buffer bloat at band "<< i << "!!!");
-            DropBeforeEnqueue (item, BUFFERBLOAT_DROP);
-            std::cout << "DROP PACKETS: NEXT CONGESTED" << std::endl;
-          }
-          // std::cout << "Buffer size of the lane "<< i << ": " << GetInternalQueue (i)->GetCurrentSize() << std::endl;
-          // std::cout << "Number of packets in lane "<< i << ": " << GetQueueDiscClass (i)->GetQueueDisc ()->GetCurrentSize() << std::endl;         
-          return item;
-        }
+      NS_LOG_LOGIC ("Popped from band " << prio << ": " << item);
+      NS_LOG_LOGIC ("Number packets band " << prio << ": " << GetInternalQueue (prio)->GetNPackets ());
+      // std::cout << "++++++ Current Queue length: " << GetInternalQueue (prio)->GetNPackets () << " at band: " << item <<  std::endl;
+      return item;
     }
-  
   NS_LOG_LOGIC ("Queue empty");
   return item;
 }
@@ -271,5 +260,87 @@ DsrVirtualQueueDisc::InitializeParams (void)
 {
   NS_LOG_FUNCTION (this);
 }
+
+uint32_t
+DsrVirtualQueueDisc::Classify ()
+{
+  if (currentFastWeight > 0)
+    {
+      if (!GetInternalQueue (0)->IsEmpty ())
+        {
+          currentFastWeight--;
+          return 0;
+        }
+      else
+        {
+          currentFastWeight = 0;
+        }
+    }
+  if (currentSlowWeight > 0)
+    {
+      if (!GetInternalQueue (1)->IsEmpty ())
+        {
+          currentSlowWeight--;
+          return 1;
+        }
+      else
+        {
+          currentSlowWeight = 0;
+        }
+    }
+  if (currentNormalWeight > 0)
+    {
+      if (!GetInternalQueue (2)->IsEmpty ())
+        {
+          currentNormalWeight--;
+          return 2;
+        }
+      else
+        {
+          currentNormalWeight = 0;
+        }
+    }
+  currentFastWeight = m_fastWeight;
+  currentSlowWeight = m_slowWeight;
+  currentNormalWeight = m_normalWeight;
+  
+   if (currentFastWeight > 0)
+    {
+      if (!GetInternalQueue (0)->IsEmpty ())
+        {
+          currentFastWeight--;
+          return 0;
+        }
+      else
+        {
+          currentFastWeight = 0;
+        }
+    }
+  if (currentSlowWeight > 0)
+    {
+      if (!GetInternalQueue (1)->IsEmpty ())
+        {
+          currentSlowWeight--;
+          return 1;
+        }
+      else
+        {
+          currentSlowWeight = 0;
+        }
+    }
+  if (currentNormalWeight > 0)
+    {
+      if (!GetInternalQueue (2)->IsEmpty ())
+        {
+          currentNormalWeight--;
+          return 2;
+        }
+      else
+        {
+          currentNormalWeight = 0;
+        }
+    }
+  return 88;
+}   
 
 } // namespace ns3

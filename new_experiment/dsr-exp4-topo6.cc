@@ -19,26 +19,16 @@
 /*
 Author: Xiangyu Ren
 */
-// Experiment3: Test impact of delay requirements under TCP traffic
+// Experiment2: Test impact of topology size and shape
 //
 // Network topology
 //
-//
-//                      
-//    n0 --m3-- n3 --h3-- n6 
-//    |h5       |m5       |m5
-//    n1 --h3-- n4 --h3-- n7
-//    |m3       |h5       |h3
-//    n2 --h3-- n5 --m5-- n8
+// Grid: 6x6
 // 
-//  h - high capacity link (200Mbps) 
-//  m - low capacity link (100Mbps)
-//  3 - Base delay = 3ms
-//  5 - Base delay = 5ms
-// 
-// - all links are point-to-point links with indicated one-way BW/delay
-// - TCP packet size of 1024 bytes, TCP-CUBIC is enabled
+// - all links are point-to-point links with same link condition
+// - UDP packet size of 1024 bytes.
 // - DropTail queues 
+// - Tracing of queues and packet receptions to file "simple-global-routing.tr"
 
 
 
@@ -56,6 +46,7 @@ Author: Xiangyu Ren
 #include "ns3/flow-monitor-helper.h"
 #include "ns3/ipv4-dsr-routing-helper.h"
 #include "ns3/netanim-module.h"
+#include "ns3/mobility-module.h"
 #include "ns3/traffic-control-module.h"
 #include "ns3/dsr-routing-module.h"
 #include "ns3/point-to-point-grid.h"
@@ -66,8 +57,8 @@ using namespace ns3;
 // ============== Auxiliary functions ===============
 
 // Function to check queue length of Routers
-std::string dir = "results/Exp1/DSR/";
-std::string ExpName = "DsrExperiment1";
+std::string dir = "results/Exp4-topo6/DSR/";
+std::string ExpName = "DsrExperiment4-topo6";
 
 void
 CheckQueueSize (Ptr<QueueDisc> queueDisc, std::string qID)
@@ -101,7 +92,7 @@ void InstallPacketSink (Ptr<Node> node, uint16_t port, std::string socketFactory
 // Function to install dsrSend application with budget
 void InstallDGPacketSend (Ptr<Node> node, Address sinkAddress, double startTime, double stopTime,
                         uint32_t packetSize, uint32_t nPacket, uint32_t budget, 
-                        uint16_t dataRate, bool flag)
+                        uint32_t dataRate, bool flag)
 {
   Ptr<Socket> dsrSocket = Socket::CreateSocket (node, UdpSocketFactory::GetTypeId ());
   Ptr<DsrApplication> dsrApp = CreateObject<DsrApplication> ();
@@ -114,7 +105,7 @@ void InstallDGPacketSend (Ptr<Node> node, Address sinkAddress, double startTime,
 // Function to install dsrSend application without budget
 void InstallBEPacketSend (Ptr<Node> node, Address sinkAddress, double startTime, double stopTime,
                         uint32_t packetSize, uint32_t nPacket, 
-                        uint16_t dataRate, bool flag)
+                        uint32_t dataRate, bool flag)
 {
   Ptr<Socket> dsrSocket = Socket::CreateSocket (node, UdpSocketFactory::GetTypeId ());
   Ptr<DsrApplication> dsrApp = CreateObject<DsrApplication> ();
@@ -148,10 +139,15 @@ main (int argc, char *argv[])
   list.Add (dsr, 10);
   InternetStackHelper internet;
   internet.SetRoutingHelper (list);
-  uint32_t nRows = 3;
-  uint32_t nCols = 3;
+  uint32_t nRows = 6;
+  uint32_t nCols = 6;
+  std::string channelDataRate = "10Mbps";
+  uint32_t delayInMicro = 3000;
   PointToPointHelper p2p;
-  PointToPointGridHelper p2pGrid(3,3,p2p);
+  p2p.SetDeviceAttribute ("DataRate", DataRateValue (DataRate (channelDataRate)));
+  p2p.SetChannelAttribute ("Delay", TimeValue (MicroSeconds(delayInMicro)));
+  PointToPointGridHelper p2pGrid(nRows,nCols,p2p);
+
   // install DSR-BP to the grid
   p2pGrid.InstallStack (internet);
   // install dsr-queue
@@ -170,15 +166,19 @@ main (int argc, char *argv[])
             }
         }
     }
-
+  Ipv4AddressHelper rowIp;
+  rowIp.SetBase ("10.1.1.0", "255.255.255.0");
+  Ipv4AddressHelper colIp;
+  colIp.SetBase ("10.2.1.0", "255.255.255.0");
+  p2pGrid.AssignIpv4Addresses (rowIp, colIp);
   // -------------- Set Metric --------------------------
   for (uint32_t i = 0; i < nRows; i ++)
     {
       for (uint32_t j = 0; j < nCols; j ++)
         {
-          std::cout << i << "," << j << std::endl;
+          // std::cout << i << "," << j << std::endl;
           Ptr<Ipv4> ipv4 = p2pGrid.GetNode (i,j)->GetObject<Ipv4> ();
-          std::cout << ipv4->GetNInterfaces () << std::endl;
+          // std::cout << ipv4->GetNInterfaces () << std::endl;
           for (uint32_t k = 1; k < ipv4->GetNInterfaces (); k ++)
             {
               // Ptr<NetDevice> dev = ipv4->GetNetDevice (k);
@@ -189,8 +189,9 @@ main (int argc, char *argv[])
               TimeValue delay;
               channel->GetAttribute ("Delay", delay);
               uint32_t matric = delay.Get ().GetMicroSeconds ();
+              // std::cout << "delay in microseconds = " << delay.Get ().GetMicroSeconds () << std::endl;
               ipv4->SetMetric(k, matric);
-              std::cout << "the matric = " << matric << std::endl;
+              // std::cout << "the matric = " << matric << std::endl;
             }
         } 
     }
@@ -198,37 +199,121 @@ main (int argc, char *argv[])
   Ipv4DSRRoutingHelper::PopulateRoutingTables ();
   // Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
-  //---------------- Application ---------------
-  // uint32_t beginTime = 0;
-  uint32_t stopTime = 10.0;
-  // ------------------------------------*** DSR Traffic Target Flow (n2 --> n6)-------------------------------------  
-  //Create a dsrSink applications 
-  // uint16_t sinkPort = 8080;
-  // Ptr<Node> sinkNode = p2pGrid.GetNode (0, 0);
-  // Ptr<NetDevice> sinkDev = sinkNode->GetDevice (0);
-  // Ptr<Ipv4> ipv4 = sinkNode->GetObject<Ipv4> ();
-  // int32_t interface = ipv4->GetInterfaceForDevice (sinkDev);
-  // Address sinkAddress (InetSocketAddress (addr, sinkPort));
-  // addr.Print (std::cout);
+  // // ---------- Allocate Node Positions --------------------------------------
+
+  // NS_LOG_INFO ("Allocate Positions to Nodes.");
+
+  // MobilityHelper mobility;
+  //  // setup the grid itself: objects are laid out
+  //  // started from (-100,-100) with 20 objects per row, 
+  //  // the x interval between each object is 5 meters
+  //  // and the y interval between each object is 20 meters
+  // mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
+  //                                "MinX", DoubleValue (-100.0),
+  //                                "MinY", DoubleValue (-100.0),
+  //                                "DeltaX", DoubleValue (10.0),
+  //                                "DeltaY", DoubleValue (10.0),
+  //                                "GridWidth", UintegerValue (20),
+  //                                "LayoutType", StringValue ("RowFirst"));
+  //  // each object will be attached a static position.
+  //  // i.e., once set by the "position allocator", the
+  //  // position will never change.
+  //  mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+  
+  //  // finalize the setup by attaching to each object
+  //  // in the input array a position and initializing
+  //  // this position with the calculated coordinates.
+  //  for (uint32_t i = 0; i < nRows; i++)
+  //  {
+  //    for (uint32_t j = 0; j < nCols; j++)
+  //    {
+  //      mobility.Install (p2pGrid.GetNode (i, j));
+  //    }
+  //  }
  
-  // InstallPacketSink (sinkNode, sinkPort, "ns3::UdpSocketFactory", beginTime, stopTime);
+  //----------------Target Application ---------------
+  //Create a dsrSink applications 
+  uint32_t beginTime = 0;
+  uint32_t stopTime = 10;
+  uint16_t sinkPort = 8080;
+  uint32_t packetSize = 52;
+  Ptr<Node> sinkNode = p2pGrid.GetNode (nRows-1, nCols-1);
+  
+  Ipv4Address sinkAddr = p2pGrid.GetIpv4Address (nRows-1, nCols-1);
+  Address sinkAddress (InetSocketAddress (sinkAddr, sinkPort));
+  InstallPacketSink (sinkNode, sinkPort, "ns3::UdpSocketFactory", beginTime, stopTime);
 
   // // create a dsrSender application
-  // // uint32_t PacketSize = 1024;
-  // // for test
-  // uint32_t PacketSize = 52;
-  // uint32_t NPacket = 1;
-  // uint32_t budget = 20;
+  // uint32_t packetSize = 1024;
+  uint32_t nPacket = 10000;
+  uint32_t budget = (nRows-1) * 5 * 2;
+  uint32_t dataRate = 5;
+  Ptr<Node> sourceNode = p2pGrid.GetNode (0, 0);
+  bool CheckFlag = true;
+  InstallDGPacketSend (sourceNode, sinkAddress, beginTime, stopTime,
+                        packetSize, nPacket, budget, 
+                        dataRate, CheckFlag);
   // for (int i=1; i<2; i++)
   // {
-  //   InstallDGPacketSend (nodes.Get(2), sinkAddress, i-1, i, PacketSize, NPacket, budget, i, true);
+  //   InstallDGPacketSend (sourceNode, sinkAddress, i-1, i,  packetSize, nPacket, budget, i, CheckFlag);
   // }
 
+  // //----------------Background Best Effort Application ---------------
+  // uint32_t nPacketInterf1 = 1;
+  // uint32_t dataRateInterf1 = 1;
+  // bool checkFlagInterf1 = false;
+  // // uint32_t i = 1;
+  // for (uint32_t i = 1; i < nRows-1; i++)
+  // {
+  //   // Sink Node Configure
+  //   Ptr<Node> sinkNodeInterf = p2pGrid.GetNode (nRows-1-i, nCols-1);
+  //   Ipv4Address sinkAddrInterf = p2pGrid.GetIpv4Address (nRows-1-i, nCols-1);
+  //   Address sinkAddressInterf (InetSocketAddress (sinkAddrInterf, sinkPort));
+  //   InstallPacketSink (sinkNodeInterf, sinkPort, "ns3::UdpSocketFactory", beginTime, stopTime);
 
+  //   // Source Node Configur
+  //   Ptr<Node> sourceNodeInterf = p2pGrid.GetNode (i, 0);
+  //   InstallBEPacketSend (sourceNodeInterf, sinkAddressInterf, beginTime, stopTime,
+  //                        packetSize, nPacketInterf1, dataRateInterf1, checkFlagInterf1);
+  // }
+
+  //----------------Background Application ---------------
+  uint32_t nPacketInterf2 = 5000;
+  // uint32_t dataRateInterf2 = 2;
+  bool checkFlagInterf2 = false;
+  // uint32_t budgetInterf = (nRows-1) * 5 * 2;
+  // uint32_t i = 1;
+  for (uint32_t i = 1; i < nRows-1; i++)
+  {
+    // Sink Node Configure
+    Ptr<Node> sinkNodeInterf = p2pGrid.GetNode (nRows-1-i, nCols-1);
+    Ipv4Address sinkAddrInterf = p2pGrid.GetIpv4Address (nRows-1-i, nCols-1);
+    Address sinkAddressInterf (InetSocketAddress (sinkAddrInterf, sinkPort));
+    InstallPacketSink (sinkNodeInterf, sinkPort, "ns3::UdpSocketFactory", beginTime, stopTime);
+
+    // Source Node Configur
+    Ptr<Node> sourceNodeInterf = p2pGrid.GetNode (i, 0);
+    // InstallDGPacketSend (sourceNodeInterf, sinkAddressInterf, beginTime, stopTime,
+    //                      packetSize, nPacketInterf2, budgetInterf,
+    //                      dataRateInterf2, CheckFlagInterf2);
+    // for (int j=1; j<11; j++)
+    // {
+    //   InstallBEPacketSend (sourceNodeInterf, sinkAddressInterf, (j-1)*0.1, j*0.1,
+    //                        packetSize, nPacketInterf2, budgetInterf,
+    //                        2+j*0.5, checkFlagInterf2);
+    // }
+    //
+    for (int j=1; j<11; j++)
+    {
+      InstallBEPacketSend (sourceNodeInterf, sinkAddressInterf, (j-1)*0.1, j*0.1,
+                           packetSize, nPacketInterf2, 
+                           2+j*0.5, checkFlagInterf2);
+    }
+  }
 
 
   // ---------------- Net Anim ---------------------
-  AnimationInterface anim(ExpName + ".xml");
+  // AnimationInterface anim(ExpName + ".xml");
 
   // -------------- Print the routing table ----------------
   Ipv4DSRRoutingHelper d;
@@ -244,3 +329,4 @@ main (int argc, char *argv[])
   Simulator::Destroy ();
   return 0;
 }
+

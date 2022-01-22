@@ -1,8 +1,0 @@
-Description to datasets
-
-dsr-delay1.mat: Guarantee property (All Delay-guaranteed, Network traffic load level 1)
-dsr-delay1_1.mat: Differentiate property (All Best-effort, Network traffic load level 1)
-dsr-delay1_2.mat: Differentiate property (half Delay-guaranteed and half Best-effort, Network traffic load level 1)
-dsr-delay2.mat: Network traffic load level 2
-dsr-delay3.mat: Network traffic load level 3
-
